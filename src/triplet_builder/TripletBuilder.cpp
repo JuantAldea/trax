@@ -411,7 +411,7 @@ int main(int argc, char *argv[]) {
 		exec.verbosity = Logger::cLIVE;
 	if(vm.count("live") && vm.count("prolix"))
 		exec.verbosity = Logger::cLIVEPROLIX;
-
+	exec.verbosity = Logger::cLIVEPROLIX;
 	//check for cpu
 	if(vm.count("cpu"))
 		exec.useCPU = true;

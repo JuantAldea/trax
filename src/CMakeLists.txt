@@ -23,13 +23,13 @@ include_directories (${EXTERNAL_BASE}/clever/src)
 #include_directories (${trax_SOURCE_DIR}/src/algo) 
 
 # include google protobuf for file i/o
-include_directories (/afs/cern.ch/cms/slc6_amd64_gcc481/external/protobuf/2.4.1/include/) 
-link_directories(/afs/cern.ch/cms/slc6_amd64_gcc481/external/protobuf/2.4.1/lib/)
+#include_directories (/afs/cern.ch/cms/slc6_amd64_gcc481/external/protobuf/2.4.1/include/) 
+#link_directories(/afs/cern.ch/cms/slc6_amd64_gcc481/external/protobuf/2.4.1/lib/)
 
 #boost
 # use custom (new) boost due to some compile bugs in the SLC6 version
-include_directories ( /afs/cern.ch/cms/slc6_amd64_gcc481/external/boost/1.51.0/include )
-link_directories( /afs/cern.ch/cms/slc6_amd64_gcc481/external/boost/1.51.0/lib )
+#include_directories ( /afs/cern.ch/cms/slc6_amd64_gcc481/external/boost/1.51.0/include )
+#link_directories( /afs/cern.ch/cms/slc6_amd64_gcc481/external/boost/1.51.0/lib )
 
 include_directories (${trax_SOURCE_DIR}) 
 
