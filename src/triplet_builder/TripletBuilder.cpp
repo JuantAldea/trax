@@ -289,8 +289,8 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 			TripletThetaPhiPredictor::clearEvents();
 			TripletThetaPhiFilter::clearEvents();
 			PrefixSum::clearEvents();
-
-		}
+            break;
+        }
 
 		delete edLoader;
 

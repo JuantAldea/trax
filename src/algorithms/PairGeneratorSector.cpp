@@ -28,6 +28,11 @@ Pairing * PairGeneratorSector::run(HitCollection & hits, const GeometrySupplemen
 
 	LOG << "Initializing oracle offsets for pair gen...";
 	clever::vector<uint, 1> m_oracleOffset(oracleOffset, ctx);
+    for (auto i : oracleOffset){
+        LOG << i << "; ";
+    }
+    LOG << std::endl;
+
 	LOG << "done[" << m_oracleOffset.get_count()  << "]" << std::endl;
 
 	LOG << "Initializing oracle for pair gen...";
