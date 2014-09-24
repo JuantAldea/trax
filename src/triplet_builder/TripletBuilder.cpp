@@ -218,11 +218,13 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 
                 LOG << "Started processing Event " << pEvent.eventnumber() << " LumiSection " <<
                     pEvent.lumisection() << " Run " << pEvent.runnumber() << std::endl;
-                validTracks[iEvt] = hits.addEvent(pEvent, geom, eventSupplement, iEvt, layerSupplement, layerConfig,
+                validTracks[iEvt] = hits.addEvent(pEvent, geom, eventSupplement, iEvt, layerSupplement,
+                                                  layerConfig,
                                                   loader.maxTracks, loader.onlyTracks);
 
                 totalValidTracks += validTracks[iEvt].size();
-                LOG << "Loaded " << validTracks[iEvt].size() << " tracks with minPt " << loader.minPt << " GeV and "
+                LOG << "Loaded " << validTracks[iEvt].size() << " tracks with minPt " << loader.minPt <<
+                    " GeV and "
                     << eventSupplement[iEvt].getNHits() << " hits" << std::endl;
 
                 if (VERBOSE) {
@@ -239,7 +241,8 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 
             LOG << "Loaded " << hits.size() << " hits in " << evtGroupSize << " events" << std::endl;
 
-            RuntimeRecord runtime(grid.config.nEvents, grid.config.nLayers, layerConfig.size(), hits.size(),
+            RuntimeRecord runtime(grid.config.nEvents, grid.config.nLayers, layerConfig.size(),
+                                  hits.size(),
                                   totalValidTracks, exec.threads);
 
             //transer hits to gpu
@@ -311,7 +314,6 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             TripletThetaPhiPredictor::clearEvents();
             TripletThetaPhiFilter::clearEvents();
             PrefixSum::clearEvents();
-            break;
         }
 
         delete edLoader;
@@ -451,6 +453,7 @@ int main(int argc, char *argv[])
         exec.verbosity = Logger::cLIVEPROLIX;
     }
     exec.verbosity = Logger::cLIVEPROLIX;
+    exec.verbosity = Logger::cPROLIX;
     //check for cpu
     if (vm.count("cpu")) {
         exec.useCPU = true;
@@ -550,7 +553,8 @@ int main(int argc, char *argv[])
 
     std::stringstream outputFileRuntime;
     outputFileRuntime << g_traxDir << "/runtime/" << "runtime." <<  getFilename(exec.configFile) <<
-                      (testSuiteFile != "" ? "." : "") << getFilename(testSuiteFile) << (exec.useCPU ? ".cpu" : ".gpu") <<
+                      (testSuiteFile != "" ? "." : "") << getFilename(testSuiteFile) << (exec.useCPU ? ".cpu" :
+                              ".gpu") <<
                       ".csv";
 
     std::ofstream runtimeRecordsFile(outputFileRuntime.str(), std::ios::trunc);
