@@ -1,4 +1,4 @@
 [submodule "src/external/clever"]
 	path = src/external/clever
-	url = https://github.com/ThomasHauth/clever.git
+	url = https://github.com/JuantAldea/clever.git
 
