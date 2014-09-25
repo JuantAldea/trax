@@ -5,7 +5,8 @@
 Pairing * PairGeneratorBeamspot::run(HitCollection & hits, const GeometrySupplement & geomSupplement,
                                      uint nThreads, const TripletConfigurations & layerTriplets, const Grid & grid)
 {
-
+    LOG << "BEGIN PairGeneratorBeamspot" << std::endl;
+    
     std::vector<uint> oracleOffset;
     uint totalMaxPairs = 0;
 
@@ -175,6 +176,8 @@ Pairing * PairGeneratorBeamspot::run(HitCollection & hits, const GeometrySupplem
             PLOG << "[" << i << "] "  << pairOffsets[i] << std::endl;
         }
     }
+
+    LOG << "END PairGeneratorBeamspot" << std::endl;
 
     return hitPairs;
 }
