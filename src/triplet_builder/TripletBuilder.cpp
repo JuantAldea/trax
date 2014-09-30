@@ -51,8 +51,6 @@ std::string g_traxDir;
 
 clever::context * createContext(ExecutionParameters exec)
 {
-
-    //
     LLOG << "Creating context for " << (exec.useCPU ? "CPU" : "GPGPU") << "...";
 
 //#define DEBUG
@@ -176,28 +174,27 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
         if (VERBOSE) {
             for (uint i = 0; i < layerConfig.size(); ++ i) {
                 TripletConfiguration config(layerConfig, i);
-                VLOG << "Layers " << config.layer1() << "-" << config.layer2() << "-" << config.layer3() <<
-                     std::endl;
-                VLOG << "\t" << "dThetaCut: " << config.getValue<dThetaCut>() << " sigmaZ: " <<
-                     config.getValue<sigmaZ>() << std::endl;
-                VLOG << "\t" << "dPhiCut: " << config.getValue<dPhiCut>() << " sigmaPhi: " <<
-                     config.getValue<sigmaPhi>() << std::endl;
+                VLOG << "Layers " << config.layer1() << "-" << config.layer2()
+                     << "-" << config.layer3() << std::endl;
+                VLOG << "\t" << "dThetaCut: " << config.getValue<dThetaCut>() << " sigmaZ: "
+                     << config.getValue<sigmaZ>() << std::endl;
+                VLOG << "\t" << "dPhiCut: " << config.getValue<dPhiCut>() << " sigmaPhi: "
+                     << config.getValue<sigmaPhi>() << std::endl;
                 VLOG << "\t" << "tipCut: " << config.getValue<tipCut>() << std::endl;
-                VLOG << "\t" << "pairSpreadZ: " << config.getValue<pairSpreadZ>() << " pairSpreadPhi: " <<
-                     config.getValue<pairSpreadPhi>() << std::endl;
+                VLOG << "\t" << "pairSpreadZ: " << config.getValue<pairSpreadZ>() << " pairSpreadPhi: "
+                     << config.getValue<pairSpreadPhi>() << std::endl;
             }
         }
 
         //configure hit loading
-
+        //number of groups
         const uint evtGroups = (uint) max(1.0f,
-                                          ceil(((float) lastEvent - loader.skipEvents) / exec.eventGrouping)); //number of groups
+                                          ceil(((float) lastEvent - loader.skipEvents) / exec.eventGrouping));
 
         uint event = loader.skipEvents;
         for (uint eventGroup = 0; eventGroup < evtGroups; ++eventGroup) {
-
-            uint evtGroupSize = std::min(exec.eventGrouping,
-                                         lastEvent - event); //if last group is not a full group
+            //if last group is not a full group
+            uint evtGroupSize = std::min(exec.eventGrouping, lastEvent - event);
 
             //initialize datastructures
             EventSupplement eventSupplement(evtGroupSize);
@@ -208,30 +205,30 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             Grid grid(gridConfig);
 
             HitCollection hits;
-            std::map<uint, HitCollection::tTrackList>
-            validTracks; //first: uint = evt in group second: tracklist
+            //first: uint = evt in group second: tracklist
+            std::map<uint, HitCollection::tTrackList> validTracks;
             uint totalValidTracks = 0;
 
             uint iEvt = 0;
             do {
                 PB_Event::PEvent pEvent = edLoader->getEvent();
 
-                LOG << "Started processing Event " << pEvent.eventnumber() << " LumiSection " <<
-                    pEvent.lumisection() << " Run " << pEvent.runnumber() << std::endl;
+                LOG << "Started processing Event " << pEvent.eventnumber() << " LumiSection "
+                    << pEvent.lumisection() << " Run " << pEvent.runnumber() << std::endl;
                 validTracks[iEvt] = hits.addEvent(pEvent, geom, eventSupplement, iEvt, layerSupplement,
-                                                  layerConfig,
-                                                  loader.maxTracks, loader.onlyTracks);
+                                                  layerConfig, loader.maxTracks, loader.onlyTracks);
 
                 totalValidTracks += validTracks[iEvt].size();
-                LOG << "Loaded " << validTracks[iEvt].size() << " tracks with minPt " << loader.minPt <<
-                    " GeV and "
-                    << eventSupplement[iEvt].getNHits() << " hits" << std::endl;
+                LOG << "Loaded " << validTracks[iEvt].size()
+                    << " tracks with minPt " << loader.minPt
+                    << " GeV and " << eventSupplement[iEvt].getNHits()
+                    << " hits" << std::endl;
 
                 if (VERBOSE) {
                     for (uint i = 1; i <= loader.maxLayer; ++i) {
-                        VLOG << "Layer " << i << ": " << layerSupplement[iEvt * loader.maxLayer + i - 1].getNHits() <<
-                             " hits" << "\t Offset: " << layerSupplement[iEvt * loader.maxLayer + i - 1].getOffset() <<
-                             std::endl;
+                        VLOG << "Layer " << i << ": " << layerSupplement[iEvt * loader.maxLayer + i - 1].getNHits()
+                             << " hits" << "\t Offset: " << layerSupplement[iEvt * loader.maxLayer + i - 1].getOffset()
+                             << std::endl;
                     }
                 }
 
@@ -242,8 +239,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             LOG << "Loaded " << hits.size() << " hits in " << evtGroupSize << " events" << std::endl;
 
             RuntimeRecord runtime(grid.config.nEvents, grid.config.nLayers, layerConfig.size(),
-                                  hits.size(),
-                                  totalValidTracks, exec.threads);
+                                  hits.size(), totalValidTracks, exec.threads);
 
             //transer hits to gpu
             hits.transfer.initBuffers(*contx, hits);
@@ -256,6 +252,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             //transferring layer supplement
             layerSupplement.transfer.initBuffers(*contx, layerSupplement);
             layerSupplement.transfer.toDevice(*contx, layerSupplement);
+
             //initializating grid
             grid.transfer.initBuffers(*contx, grid);
             grid.transfer.toDevice(*contx, grid);
