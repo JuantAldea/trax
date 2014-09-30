@@ -12,7 +12,7 @@ Pairing * TripletThetaPhiPredictor::run(HitCollection & hits, const DetectorGeom
                                         int nThreads, const TripletConfigurations & layerTriplets, const Grid & grid,
                                         const Pairing & pairs)
 {
-
+    PLOG << "BEGIN TripletThetaPhiPredictor" << std::endl;
     uint nPairs = pairs.pairing.get_count();
 
     LOG << "Initializing prefix sum for prediction...";
@@ -43,6 +43,7 @@ Pairing * TripletThetaPhiPredictor::run(HitCollection & hits, const DetectorGeom
                        //thread config
                        range(nGroups * nThreads),
                        range(nThreads));
+
     TripletThetaPhiPredictor::events.push_back(evt);
     LOG << "done" << std::endl;
 
@@ -107,6 +108,7 @@ Pairing * TripletThetaPhiPredictor::run(HitCollection & hits, const DetectorGeom
               //thread config
               range(nGroups * nThreads),
               range(nThreads));
+
     TripletThetaPhiPredictor::events.push_back(evt);
     LOG << "done" << std::endl;
 
@@ -139,6 +141,8 @@ Pairing * TripletThetaPhiPredictor::run(HitCollection & hits, const DetectorGeom
             PLOG << "[" << i << "] "  << candOffsets[i] << std::endl;
         }
     }
+
+    PLOG << "END TripletThetaPhiPredictor" << std::endl;
 
     return m_triplets;
 }

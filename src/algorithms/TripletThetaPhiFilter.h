@@ -51,11 +51,13 @@ public:
                   oclDEFINES,
                   __kernel void filterCount(
                       //configuration
-                      __global const float * thetaCut, __global const float * phiCut, __global const float * maxTIP, const float minRadius,
+                      __global const float * thetaCut, __global const float * phiCut, __global const float * maxTIP,
+                      const float minRadius,
                       // hit input
                       __global const uint2 * pairs,
                       __global const uint2 * triplets, const uint nTriplets,
-                      __global const float * hitGlobalX, __global const float * hitGlobalY, __global const float * hitGlobalZ,
+                      __global const float * hitGlobalX, __global const float * hitGlobalY,
+                      __global const float * hitGlobalZ,
                       __global const uint * hitEvent, __global const uint * hitLayer,
                       // intermeditate data: oracle for hit pair + candidate combination, prefix sum for found tracklets
                       __global uint * oracle)
@@ -67,9 +69,10 @@ public:
             uint firstHit = pairs[triplets[gid].x].x;
             uint secondHit = pairs[triplets[gid].x].y;
             uint thirdHit = triplets[gid].y;
-
-            uint event = hitEvent[firstHit]; // must be the same as hitEvent[secondHit] --> ensured during pair building
-            uint layerTriplet = hitLayer[firstHit] - 1; //the layerTriplet is defined by its innermost layer
+            // must be the same as hitEvent[secondHit] --> ensured during pair building
+            uint event = hitEvent[firstHit];
+            //the layerTriplet is defined by its innermost layer
+            uint layerTriplet = hitLayer[firstHit] - 1;
 
             float dThetaCut = thetaCut[layerTriplet];
             float dPhiCut = phiCut[layerTriplet];
@@ -78,20 +81,26 @@ public:
             bool valid = true;
 
             //tanTheta1
-            float angle1 = atan2(sqrt((hitGlobalX[secondHit] - hitGlobalX[firstHit]) * (hitGlobalX[secondHit] - hitGlobalX[firstHit])
-                                      + (hitGlobalY[secondHit] - hitGlobalY[firstHit]) * (hitGlobalY[secondHit] - hitGlobalY[firstHit]))
+            float angle1 = atan2(sqrt((hitGlobalX[secondHit] - hitGlobalX[firstHit]) *
+                                      (hitGlobalX[secondHit] - hitGlobalX[firstHit])
+                                      + (hitGlobalY[secondHit] - hitGlobalY[firstHit]) * (hitGlobalY[secondHit] -
+                                              hitGlobalY[firstHit]))
                                  , (hitGlobalZ[secondHit] - hitGlobalZ[firstHit]));
             //tanTheta2
-            float angle2 = atan2(sqrt((hitGlobalX[thirdHit] - hitGlobalX[secondHit]) * (hitGlobalX[thirdHit] - hitGlobalX[secondHit])
-                                      + (hitGlobalY[thirdHit] - hitGlobalY[secondHit]) * (hitGlobalY[thirdHit] - hitGlobalY[secondHit]))
+            float angle2 = atan2(sqrt((hitGlobalX[thirdHit] - hitGlobalX[secondHit]) *
+                                      (hitGlobalX[thirdHit] - hitGlobalX[secondHit])
+                                      + (hitGlobalY[thirdHit] - hitGlobalY[secondHit]) * (hitGlobalY[thirdHit] -
+                                              hitGlobalY[secondHit]))
                                  , (hitGlobalZ[thirdHit] - hitGlobalZ[secondHit]));
             float delta = fabs(angle2 / angle1);
             valid = valid * (1 - dThetaCut <= delta && delta <= 1 + dThetaCut);
 
             //tanPhi1
-            angle1 = atan2((hitGlobalY[secondHit] - hitGlobalY[firstHit]) , (hitGlobalX[secondHit] - hitGlobalX[firstHit]));
+            angle1 = atan2((hitGlobalY[secondHit] - hitGlobalY[firstHit]) ,
+                           (hitGlobalX[secondHit] - hitGlobalX[firstHit]));
             //tanPhi2
-            angle2 = atan2((hitGlobalY[thirdHit] - hitGlobalY[secondHit]) , (hitGlobalX[thirdHit] - hitGlobalX[secondHit]));
+            angle2 = atan2((hitGlobalY[thirdHit] - hitGlobalY[secondHit]) ,
+                           (hitGlobalX[thirdHit] - hitGlobalX[secondHit]));
 
             delta = angle2 - angle1;
             delta += (delta > M_PI_F) ? -2 * M_PI_F : (delta < -M_PI_F) ? 2 * M_PI_F : 0; //fix wrap around
@@ -154,7 +163,8 @@ public:
 
     KERNEL_CLASSP(filterPopCount, oclDEFINES,
 
-                  __kernel void filterPopCount(__global const uint * oracle, __global uint * prefixSum, const uint n)
+                  __kernel void filterPopCount(__global const uint * oracle, __global uint * prefixSum,
+                          const uint n)
     {
 
         size_t gid = get_global_id(0);
@@ -188,7 +198,8 @@ public:
             //configure oracle
             uint lOracle = oracle[gid]; //load oracle byte
             //loop over bits of oracle byte
-            for (uint i = 0; i < 32 /*&& pos < nextThread*/; ++i) { // pos < prefixSum[id+1] can lead to thread divergence
+            for (uint i = 0; i < 32 /*&& pos < nextThread*/;
+                    ++i) { // pos < prefixSum[id+1] can lead to thread divergence
                 //is this a valid triplet?
                 bool valid = lOracle & (1 << i);
                 //last triplet written on [pos] is valid one

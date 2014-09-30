@@ -11,7 +11,7 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
         const Pairing & pairs, const Pairing & tripletCandidates,
         int nThreads, const TripletConfigurations & layerTriplets)
 {
-
+    LOG << "BEGIN TripletThetaPhiFilter" << std::endl;
     uint nTripletCandidates = tripletCandidates.pairing.get_count();
     uint nOracleCount = std::ceil(nTripletCandidates / 32.0);
     uint nGroups = (uint) std::max(1.0f, ceil(((float) nTripletCandidates) / nThreads));
@@ -23,11 +23,13 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
     LOG << "Running filter kernel...";
     cl_event evt = filterCount.run(
                        //configuration
-                       layerTriplets.transfer.buffer(dThetaCut()), layerTriplets.transfer.buffer(dPhiCut()), layerTriplets.transfer.buffer(tipCut()), layerTriplets.minRadiusCurvature(),
+                       layerTriplets.transfer.buffer(dThetaCut()), layerTriplets.transfer.buffer(dPhiCut()),
+                       layerTriplets.transfer.buffer(tipCut()), layerTriplets.minRadiusCurvature(),
                        // input
                        pairs.pairing.get_mem(),
                        tripletCandidates.pairing.get_mem(), nTripletCandidates,
-                       hits.transfer.buffer(GlobalX()), hits.transfer.buffer(GlobalY()), hits.transfer.buffer(GlobalZ()),
+                       hits.transfer.buffer(GlobalX()), hits.transfer.buffer(GlobalY()),
+                       hits.transfer.buffer(GlobalZ()),
                        hits.transfer.buffer(EventNumber()), hits.transfer.buffer(DetectorLayer()),
                        // output
                        m_oracle.get_mem(),
@@ -77,9 +79,11 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
 
     //Calculate prefix sum
     PrefixSum prefixSum(ctx);
-    evt = prefixSum.run(m_prefixSum.get_mem(), m_prefixSum.get_count(), nThreads, TripletThetaPhiFilter::events);
+    evt = prefixSum.run(m_prefixSum.get_mem(), m_prefixSum.get_count(), nThreads,
+                        TripletThetaPhiFilter::events);
     uint nFoundTriplets;
-    transfer::downloadScalar(m_prefixSum, nFoundTriplets, ctx, true, m_prefixSum.get_count() - 1, 1, &evt);
+    transfer::downloadScalar(m_prefixSum, nFoundTriplets, ctx, true, m_prefixSum.get_count() - 1,
+                             1, &evt);
 
 
     if (PROLIX) {
@@ -94,7 +98,8 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
         PLOG << std::endl;
     }
 
-    TrackletCollection * tracklets = new TrackletCollection(nFoundTriplets, grid.config.nEvents, layerTriplets.size(), ctx);
+    TrackletCollection * tracklets = new TrackletCollection(nFoundTriplets, grid.config.nEvents,
+            layerTriplets.size(), ctx);
     LOG << "Reserving space for " << nFoundTriplets << " tracklets" << std::endl;
 
     tracklets->transfer.initBuffers(ctx, *tracklets);
@@ -106,7 +111,8 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
               tripletCandidates.pairing.get_mem(),
               m_oracle.get_mem(), nOracleCount, m_prefixSum.get_mem(),
               // output
-              tracklets->transfer.buffer(TrackletHit1()), tracklets->transfer.buffer(TrackletHit2()), tracklets->transfer.buffer(TrackletHit3()),
+              tracklets->transfer.buffer(TrackletHit1()), tracklets->transfer.buffer(TrackletHit2()),
+              tracklets->transfer.buffer(TrackletHit3()),
               tracklets->trackletOffsets.get_mem(),
               //thread config
               range(nGroups * nThreads), //same number of groups as for popcount kernel
@@ -130,7 +136,8 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
     LOG << "done" << std::endl;
     std::vector<uint> tripOffsetsNonMonotonized = tracklets->getTrackletOffsets();
     LOG << "Running filter offset monotonize kernel...";
-    nGroups = (uint) std::max(1.0f, ceil(((float) tracklets->trackletOffsets.get_count()) / nThreads));
+    nGroups = (uint) std::max(1.0f,
+                              ceil(((float) tracklets->trackletOffsets.get_count()) / nThreads));
     evt = filterOffsetMonotonizeStore.run(
               tracklets->trackletOffsets.get_mem(), tracklets->trackletOffsets.get_count(),
               range(nGroups * nThreads),
@@ -145,7 +152,8 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
         PLOG << "Tracklets: " << std::endl;
         for (uint i = 0; i < nFoundTriplets; ++i) {
             Tracklet tracklet(*tracklets, i);
-            PLOG << "[" << i << "]" << "[" << tracklet.hit1() << "-" << tracklet.hit2() << "-" << tracklet.hit3() << "]" << std::endl;;
+            PLOG << "[" << i << "]" << "[" << tracklet.hit1() << "-" << tracklet.hit2() << "-" <<
+                 tracklet.hit3() << "]" << std::endl;;
         }
     }
 
@@ -156,7 +164,6 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
         for (uint i = 0; i < tripOffsetsNonMonotonized.size(); ++i) {
             LOG << "[" << i << "] "  << tripOffsetsNonMonotonized[i] << std::endl;
         }
-        LOG << "##########################" << std::endl;
         PLOG << "Fetching triplet offets...";
         std::vector<uint> tripOffsets = tracklets->getTrackletOffsets();
         PLOG << "done[" << tripOffsets.size() << "]" << std::endl;
@@ -169,19 +176,18 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
         if (tripOffsetsNonMonotonized != tripOffsets) {
             LOG << "DIFF" << std::endl;
         }
+        
         PLOG << "WHAT ARE THESE Offsets:" << std::endl;
         for (uint i = 0; i < tripOffsets.size(); ++i) {
             Tracklet tracklet(*tracklets, i);
-            PLOG << "[" << tripOffsets[i] << "]" << "[" << tracklet.hit1() << "-" << tracklet.hit2() << "-" << tracklet.hit3() << "]" << std::endl;;
+            PLOG << "[" << tripOffsets[i] << "]" << "[" << tracklet.hit1() << "-" << tracklet.hit2() << "-"
+                 << tracklet.hit3() << "]" << std::endl;;
         }
 
     }
 
+    LOG << "END TripletThetaPhiFilter" << std::endl;
+
     return tracklets;
 }
-
-
-
-
-
 

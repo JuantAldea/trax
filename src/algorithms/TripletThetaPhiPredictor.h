@@ -24,6 +24,7 @@ using namespace std;
     every hit with every other hit.
     The man intention is to test the data transfer and the data structure
  */
+
 class TripletThetaPhiPredictor: public KernelWrapper<TripletThetaPhiPredictor>
 {
 
@@ -68,40 +69,41 @@ public:
                       // intermeditate data: oracle for hit pair + candidate combination, prefix sum for found tracklets
                       __global uint * prefixSum)
     {
-
         size_t gid = get_global_id(0); // thread
 
         PRINTF(("%lu:\n", gid));
 
-        if (gid < nPairs) { //divergence only in last work group
+        //divergence only in last work group
+        if (gid < nPairs) {
             //get hit pair
             uint firstHit = pairs[gid].x;
             uint secondHit = pairs[gid].y;
 
             PRINTF(("%lu: pair %u-%u\n", gid, firstHit, secondHit));
 
-            uint event =
-                hitEvent[firstHit]; // must be the same as hitEvent[secondHit] --> ensured during pair building
-            uint layerTriplet = hitLayer[firstHit] -
-                                1; //the layerTriplet is defined by its innermost layer
+            // must be the same as hitEvent[secondHit] --> ensured during pair building
+            uint event = hitEvent[firstHit];
 
-            uint layer = layer3[layerTriplet] - 1; //outer layer
-            __global const uint * lGrid3 = &grid[event * nLayers * (nSectorsZ + 1) *
-                                                 (nSectorsPhi + 1) + layer * (nSectorsZ + 1) * (nSectorsPhi +
-                                                         1)]; //offset into grid for easier access
+            //the layerTriplet is defined by its innermost layer
+            uint layerTriplet = hitLayer[firstHit] - 1;
+
+            //outer layer
+            uint layer = layer3[layerTriplet] - 1;
+
+            //offset into grid for easier access
+            __global const uint * lGrid3 = &grid[event * nLayers * (nSectorsZ + 1) * (nSectorsPhi + 1)
+                                                 + layer * (nSectorsZ + 1) * (nSectorsPhi + 1)];
 
             PRINTF(("%lu: pair %u-%u of event %u, layerTriplet %u outer layer: %u\n", gid, firstHit,
                     secondHit, event, layerTriplet, layer));
 
-            //PRINTF(("%lu-%lu-%lu: second layer from %u with %u hits\n", event, layerTriplet, thread, offset, nHits3));
-
-            //ulong oOffset = oracleOffset[event*nLayerTriplets+layerTriplet]; //offset in oracle array
             uint nFound = 0;
 
             float sigmaZ = gSigmaZ[layerTriplet];
             float sigmaPhi = gSigmaPhi[layerTriplet];
             float minLayerRadius = gMinLayerRadius[layer];
             float maxLayerRadius = gMaxLayerRadius[layer];
+
 
 
             PRINTF(("id %lu loaded configuration\n", gid));
@@ -124,13 +126,13 @@ public:
                      p1.y));   //short form to get r min
 
             //the origin is p1
-            // the cotangent is defined by p1 and p2 minus tip
+            //the cotangent is defined by p1 and p2 minus tip
             float rOrigin = p1.x * p1.x + p1.y * p1.y;
             rOrigin = sqrt(rOrigin - tip2);
             float cotTheta = (p2.z - p1.z) / (sqrt(p2.x * p2.x + p2.y * p2.y - tip2) - rOrigin);
 
 
-            //predict z with minimum and maximum layer radisu
+            //predict z with minimum and maximum layer minRadiusCurvature
             float tmp = p1.z + (sqrt(maxLayerRadius * maxLayerRadius - tip2) - rOrigin) * cotTheta;
             float zLow = p1.z + (sqrt(minLayerRadius * minLayerRadius - tip2) - rOrigin) * cotTheta;
 
@@ -138,10 +140,10 @@ public:
             zLow = (tmp > zLow) * zLow + (tmp < zLow) * tmp;
 
             zLow -= sigmaZ;
-            zHigh += sigmaPhi;
+            zHigh += sigmaZ;
 
-            uint zLowSector = max((int) floor((zLow - minZ) / sectorSizeZ),
-                                  0); // signed int because zLow could be lower than minZ
+            // signed int because zLow could be lower than minZ
+            uint zLowSector = max((int) floor((zLow - minZ) / sectorSizeZ), 0);
             uint zHighSector = min((uint) floor((zHigh - minZ) / sectorSizeZ) + 1, nSectorsZ);
 
             //PRINTF(("%lu-%lu-%lu: hit pair %u -> prediction %f-%f [%u,%u]\n", event, layerTriplet, thread, i, zLow, zHigh, zLowSector, zHighSector));
@@ -150,9 +152,11 @@ public:
             float phi = atan2(p2.y, p2.x); //phi second hit
             tmp = atan2(p1.y, p1.x); //phi first hit
 
-            float dPhi = phi - tmp; //delta might be ]-pi,pi[
-            dPhi += (dPhi > M_PI_F) ? -2 * M_PI_F : (dPhi < -M_PI_F) ? 2 * M_PI_F : 0; //fix wrap around
-            dPhi = fabs(dPhi); //absolute value
+            //delta might be ]-pi,pi[
+            float dPhi = phi - tmp;
+            //fix wrap around
+            dPhi += (dPhi > M_PI_F) ? -2 * M_PI_F : (dPhi < -M_PI_F) ? 2 * M_PI_F : 0;
+            dPhi = fabs(dPhi);
 
             float dHits = sqrt((p2.x - p1.x) * (p2.x - p1.x)
                                + (p2.y - p1.y) * (p2.y - p1.y));
@@ -164,7 +168,8 @@ public:
                                 (2 * minRadiusCurvature)));
             dPhi = max(dPhi, max(tmp, phiLow));
 
-            float phiHigh = phi + dPhi + sigmaPhi; // phi high may be greater than PI
+            // phi high may be greater than PI
+            float phiHigh = phi + dPhi + sigmaPhi;
             phiLow = phi - dPhi - sigmaPhi;
 
             //deal with wrap around
@@ -192,65 +197,26 @@ public:
                 prefetch(&hitGlobalY[zSectorStart], zSectorLength);
                 prefetch(&hitGlobalZ[zSectorStart], zSectorLength);
 
-                uint j = lGrid3[zSector * (nSectorsPhi + 1) + phiLowSector];
+
                 uint end2 = wrapAround * zSectorEnd + //add end of layer
                             lGrid3[zSector * (nSectorsPhi + 1) + phiHighSector] //actual end of sector
                             - wrapAround * (zSectorStart); //substract start of zSector
 
-                for (; j < end2; ++j) {
+                for (uint j = lGrid3[zSector * (nSectorsPhi + 1) + phiLowSector]; j < end2; ++j) {
                     // check z range
                     ulong index = j - (j >= zSectorEnd) * zSectorLength;
                     bool valid = zLow <= hitGlobalZ[index] && hitGlobalZ[index] <= zHigh;
-
-                    /*
-                    if(!valid && hitId[firstHit] == hitId[secondHit] && hitId[secondHit] == hitId[index]){
-                        PRINTF("%i-%i-%i [%i]: z exp[%f]: %f - %f; z act: %f\n", firstHit, secondHit, index, hitId[firstHit], hitGlobalZ[secondHit], zLow, zHigh, hitGlobalZ[index]);
-                        float thetaAct = atan2(sign(hitGlobalY[index])*sqrt((hitGlobalX[index] - hitGlobalX[secondHit])*(hitGlobalX[index] - hitGlobalX[secondHit])
-                                + (hitGlobalY[index] - hitGlobalY[secondHit])*(hitGlobalY[index] - hitGlobalY[secondHit]))
-                                , ( hitGlobalZ[index] - hitGlobalZ[secondHit] ));
-                        //if(!(thetaLow <= thetaAct && thetaAct <= thetaHigh))
-                        PRINTF("\ttheta exp[%f]: %f - %f; theta act: %f\n", theta, atan(1/cotThetaLow), atan(1/cotThetaHigh), thetaAct);
-                        //else {
-                        float r2 = sqrt(hitGlobalX[secondHit]*hitGlobalX[secondHit] + hitGlobalY[secondHit]*hitGlobalY[secondHit]);
-                        float r3 = sqrt(hitGlobalX[index]*hitGlobalX[index] + hitGlobalY[index]*hitGlobalY[index]);
-
-                        PRINTF("\tdr exp: %f - %f; dr act: %f\n", dRmin, dRmax, r3-r2);
-                        //}
-                    }
-                     */
 
                     // check phi range
                     float actPhi = atan2(hitGlobalY[index], hitGlobalX[index]);
                     valid = valid * ((!wrapAround && (phiLow <= actPhi && actPhi <= phiHigh))
                                      || (wrapAround && ((phiLow <= actPhi && actPhi <= M_PI_F) || (-M_PI_F <= actPhi
                                                         && actPhi <= phiHigh))));
-
-                    /*
-                    if(!valid && hitId[firstHit] == hitId[secondHit] && hitId[secondHit] == hitId[index]){
-                        PRINTF("%i-%i-%i [%i]: phi exp: %f - %f; phi act: %f\n", firstHit, secondHit, index, hitId[firstHit], phiLow, phiHigh, actPhi);
-                        //}
-                    }
-                     */
-
-                    //if valid update nFound
                     nFound += valid;
-
-                    //update oracle
-                    //index = (i - pairOffset)*nHits3 + j - (j >= zSectorEnd) * zSectorLength - offset;
-
-                    //PRINTF((valid ? "%lu-%lu-%lu: setting bit for %u and %u (%u)\n" : "", event, layerTriplet, thread, i-pairOffset, j - (j >= zSectorEnd) * zSectorLength, j));
-
-                    //if(valid && ((oOffset + index) / 32) > 89766864)
-                    //printf("%lu-%lu-%lu: setting bit for %u and %u (%u) -> %u: %u-%u\n", event, layerTriplet, thread, i-pairOffset, j - (j >= zSectorEnd) * zSectorLength, j,  index, ((oOffset + index) / 32), (valid << (index % 32)));
-
-                    //atomic_or(&oracle[(oOffset + index) / 32], (valid << (index % 32)));
-
                 } // end hit loop
             } // end sector loop
 
             prefixSum[gid] = nFound;
-
-            //PRINTF("[%lu] rejZ: %u, rejP: %u, rejB: %u\n", gid, rejZ, rejP, rejB);
         }
     }, cl_mem, cl_mem, cl_mem, cl_mem,
     cl_mem, cl_mem, uint,
@@ -309,9 +275,6 @@ public:
                                                  (nSectorsPhi + 1) + layer * (nSectorsZ + 1) * (nSectorsPhi +
                                                          1)]; //offset into grid for easier access
 
-            uint pos = prefixSum[gid]; //first position to write
-            uint nextThread = prefixSum[gid + 1]; //first position of next thread
-
             float sigmaZ = gSigmaZ[layerTriplet];
             float sigmaPhi = gSigmaPhi[layerTriplet];
             float minLayerRadius = gMinLayerRadius[layer];
@@ -319,15 +282,6 @@ public:
 
             PRINTF(("%lu: pair %u-%u of event %u, layerTriplet %u\n", gid, firstHit, secondHit, event,
                     layerTriplet));
-
-            //configure oracle
-            //ulong byte = oracleOffset[event*nLayerTriplets+layerTriplet]; //offset in oracle array
-            //uint bit = (byte + i*nHits2) % 32;
-            //byte += (i*nHits2); byte /= 32;
-            //uint sOracle = oracle[byte];
-
-            //(("%lu-%lu-%lu: from hit1 %u to %u with hits2 %u using memory %u to %u\n", event, layerTriplet, thread, i, end, nHits3, pos, nextThread));
-            //for(; i < end; i += threads){
 
             //theta
             //load hit data
@@ -363,11 +317,9 @@ public:
             zLow -= sigmaZ;
             zHigh += sigmaZ;
 
-            uint zLowSector = max((int) floor((zLow - minZ) / sectorSizeZ),
-                                  0); // signed int because zLow could be lower than minZ
+            // signed int because zLow could be lower than minZ
+            uint zLowSector = max((int) floor((zLow - minZ) / sectorSizeZ), 0);
             uint zHighSector = min((uint) floor((zHigh - minZ) / sectorSizeZ) + 1, nSectorsZ);
-
-            //PRINTF(("%lu-%lu-%lu: hit pair %u -> prediction %f-%f [%u,%u]\n", event, layerTriplet, thread, i, zLow, zHigh, zLowSector, zHighSector));
 
             //phi
             float phi = atan2(p2.y, p2.x); //phi second hit
@@ -402,8 +354,9 @@ public:
             uint phiLowSector = max((uint) floor((phiLow - minPhi) / sectorSizePhi), 0u);
             uint phiHighSector = min((uint) floor((phiHigh - minPhi) / sectorSizePhi) + 1, nSectorsPhi);
 
-            //PRINTF(("%lu-%lu-%lu: hit pair %u:  phi = %f - %f -> [%u,%u] %s\n", event, layerTriplet, thread, i, phiLow, phiHigh, phiLowSector, phiHighSector, wrapAround ? " wrapAround" : ""));
 
+            uint pos = prefixSum[gid]; //first position to write
+            uint nextThread = prefixSum[gid + 1]; //first position of next thread
             for (uint zSector = zLowSector; zSector < zHighSector; ++ zSector) {
 
                 uint zSectorStart = lGrid3[(zSector) * (nSectorsPhi + 1)];
@@ -414,34 +367,18 @@ public:
                 prefetch(&hitGlobalY[zSectorStart], zSectorLength);
                 prefetch(&hitGlobalZ[zSectorStart], zSectorLength);
 
-                uint j = lGrid3[zSector * (nSectorsPhi + 1) + phiLowSector];
+
                 uint end2 = wrapAround * zSectorEnd + //add end of layer
                             lGrid3[zSector * (nSectorsPhi + 1) + phiHighSector] //actual end of sector
                             - wrapAround * (zSectorStart); //substract start of zSector
 
-                for (; j < end2
-                        && pos < nextThread; ++j) { // pos < prefixSum[id+1] can lead to thread divergence
+                // pos < prefixSum[id+1] can lead to thread divergence
+                for (uint j = lGrid3[zSector * (nSectorsPhi + 1) + phiLowSector]; j < end2
+                        && pos < nextThread; ++j) {
 
                     // check z range
                     ulong index = j - (j >= zSectorEnd) * zSectorLength;
                     bool valid = zLow <= hitGlobalZ[index] && hitGlobalZ[index] <= zHigh;
-
-                    /*
-                                        if(!valid && hitId[firstHit] == hitId[secondHit] && hitId[secondHit] == hitId[index]){
-                                            PRINTF("%i-%i-%i [%i]: z exp[%f]: %f - %f; z act: %f\n", firstHit, secondHit, index, hitId[firstHit], hitGlobalZ[secondHit], zLow, zHigh, hitGlobalZ[index]);
-                                            float thetaAct = atan2(sign(hitGlobalY[index])*sqrt((hitGlobalX[index] - hitGlobalX[secondHit])*(hitGlobalX[index] - hitGlobalX[secondHit])
-                                                    + (hitGlobalY[index] - hitGlobalY[secondHit])*(hitGlobalY[index] - hitGlobalY[secondHit]))
-                                                    , ( hitGlobalZ[index] - hitGlobalZ[secondHit] ));
-                                            //if(!(thetaLow <= thetaAct && thetaAct <= thetaHigh))
-                                            PRINTF("\ttheta exp[%f]: %f - %f; theta act: %f\n", theta, atan(1/cotThetaLow), atan(1/cotThetaHigh), thetaAct);
-                                            //else {
-                                            float r2 = sqrt(hitGlobalX[secondHit]*hitGlobalX[secondHit] + hitGlobalY[secondHit]*hitGlobalY[secondHit]);
-                                            float r3 = sqrt(hitGlobalX[index]*hitGlobalX[index] + hitGlobalY[index]*hitGlobalY[index]);
-
-                                            PRINTF("\tdr exp: %f - %f; dr act: %f\n", dRmin, dRmax, r3-r2);
-                                            //}
-                                        }
-                     */
 
                     // check phi range
                     float actPhi = atan2(hitGlobalY[index], hitGlobalX[index]);
@@ -449,27 +386,6 @@ public:
                     valid = valid * ((!wrapAround && (phiLow <= actPhi && actPhi <= phiHigh))
                                      || (wrapAround && ((phiLow <= actPhi && actPhi <= M_PI_F) || (-M_PI_F <= actPhi
                                                         && actPhi <= phiHigh))));
-
-                    /*
-                                        if(!valid && hitId[firstHit] == hitId[secondHit] && hitId[secondHit] == hitId[index]){
-                                            PRINTF("%i-%i-%i [%i]: phi exp: %f - %f; phi act: %f\n", firstHit, secondHit, index, hitId[firstHit], phiLow, phiHigh, actPhi);
-                                            //}
-                                        }
-
-                    //is this a valid triplet?
-                    ulong index = (i - pairOffset)*nHits3 + j - (j >= zSectorEnd) * zSectorLength - offset;
-                    //bool valid = oracle[(byte + index) / 32] & (1 << (index % 32));
-
-                    PRINTF((valid ? "%lu-%lu-%lu: valid bit for %u and %u -> %u written at %u\n" : "", event, layerTriplet, thread, i-pairOffset, offset+j,  index, pos));
-
-                    //performance gain?
-                    bool valid = sOracle & (1 << bit);
-                    ++bit;
-                    if(bit == 32){
-                    bit = 0;
-                    ++byte;
-                    sOracle=oracle[byte];
-                    }*/
 
                     //last triplet written on [pos] is valid one
                     if (valid) {
@@ -488,18 +404,17 @@ public:
             //determine triplet offsets
             if (gid < nPairs - 1) { //not the last hit pair
                 uint nextHit = pairs[gid + 1].x;
-                uint nextEvent =
-                    hitEvent[nextHit]; // must be the same as hitEvent[secondHit] --> ensured during pair building
-                uint nextLayerTriplet = hitLayer[nextHit] -
-                                        1; //the layerTriplet is defined by its innermost layer
-
-                if (layerTriplet != nextLayerTriplet
-                        || event != nextEvent) { //this thread is the last one processing an element of this particular event and layer triplet
+                // must be the same as hitEvent[secondHit] --> ensured during pair building
+                uint nextEvent = hitEvent[nextHit];
+                //the layerTriplet is defined by its innermost layer
+                uint nextLayerTriplet = hitLayer[nextHit] - 1;
+                //this thread is the last one processing an element of this particular event and layer triplet
+                if (layerTriplet != nextLayerTriplet || event != nextEvent) {
                     tripletOffsets[event * nLayerTriplets + layerTriplet + 1] = nextThread;
                 }
             } else {
-                tripletOffsets[event * nLayerTriplets + layerTriplet + 1] =
-                    nextThread; // this is the last pair, just store it
+                // this is the last pair, just store it
+                tripletOffsets[event * nLayerTriplets + layerTriplet + 1] = nextThread;
             }
         }
     }, cl_mem, cl_mem, cl_mem, cl_mem,
