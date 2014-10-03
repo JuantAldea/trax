@@ -7,7 +7,7 @@ const std::string PrefixSum::oclDEFINES = 	 "#define MEMORY_BANK_COUNT       (16
 
 cl_event PrefixSum::run(cl_mem input, const uint size, uint nThreads)
 {
-
+	clear();
 	VLOG << "scanning " << size << " elements with max " << nThreads << " work-items ";
 	createPartialSums(size, nThreads);
 	cl_event evt = recursiveScan(input, size, nThreads, 0);
@@ -17,7 +17,7 @@ cl_event PrefixSum::run(cl_mem input, const uint size, uint nThreads)
 
 cl_event PrefixSum::run(cl_mem input, const uint size, uint nThreads, std::vector<cl_event> & lEvents)
 {
-
+	clear();
 	VLOG << "scanning " << size << " elements with max " << nThreads << " work-items ";
 	createPartialSums(size, nThreads);
 
@@ -31,6 +31,14 @@ cl_event PrefixSum::run(cl_mem input, const uint size, uint nThreads, std::vecto
 	return evt;
 }
 
+void PrefixSum::clear()
+{
+	for (auto i : partialSums){
+		delete i;
+	}
+
+	partialSums.clear();
+}
 
 void PrefixSum::createPartialSums(uint size, uint wg){
 

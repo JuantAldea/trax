@@ -12,11 +12,7 @@
 using namespace clever;
 using namespace std;
 
-/*
-	Class which implements to most dump tracklet production possible - combine
-	every hit with every other hit.
-	The man intention is to test the data transfer and the data structure
- */
+
 class PrefixSum: public KernelWrapper<PrefixSum>
 {
 private:
@@ -34,15 +30,22 @@ public:
 		prefixSumWG(ctext),
 		prefixSumPartial(ctext),
 		prefixSumUniformAdd(ctext)
-{
+	{
 		// create the buffers this algorithm will need to run
 		PLOG << "PrefixSum Kernel WorkGroupSize: " << prefixSumPartial.getWorkGroupSize() << std::endl;
-}
+	}
+	
+	~PrefixSum()
+	{
+		clear();
+	}
 
 	cl_event run(cl_mem input, const uint size, uint nThreads);
 	cl_event run(cl_mem input, const uint size, uint nThreads, std::vector<cl_event> & lEvents);
 
+	
 private:
+	void clear();
 
 	std::vector<clever::vector<uint, 1> *> partialSums;
 
