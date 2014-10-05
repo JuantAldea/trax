@@ -39,7 +39,7 @@ public:
 		PLOG << "Grid building Kernel WorkGroupSize: " << gridCount.getWorkGroupSize() << std::endl;
 }
 
-	cl_ulong run(HitCollection & hits, uint nThreads, const EventSupplement & eventSupplement, const LayerSupplement & layerSupplement, Grid & grid);
+	cl_ulong run(HitCollection & hits, uint nThreads, const EventSupplement & eventSupplement, const LayerSupplement & layerSupplement, Grid & grid, bool printProlix = false);
 
 	void printGrid(const Grid & grid);
 

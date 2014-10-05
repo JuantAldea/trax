@@ -44,7 +44,7 @@ public:
     Pairing * run(HitCollection & hits, const DetectorGeometry & geom,
                   const GeometrySupplement & geomSupplement, const Dictionary & dict,
                   int nThreads, const TripletConfigurations & layerTriplets, const Grid & grid,
-                  const Pairing & pairs);
+                  const Pairing & pairs, bool printProlix = false);
 
     KERNEL_CLASSP(predictCount,
                   oclDEFINES,// "#define PRINTF(a) printf a",

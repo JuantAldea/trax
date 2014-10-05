@@ -8,7 +8,9 @@ const std::string PrefixSum::oclDEFINES = 	 "#define MEMORY_BANK_COUNT       (16
 cl_event PrefixSum::run(cl_mem input, const uint size, uint nThreads)
 {
 	clear();
+#ifdef PRINT_DEBUG
 	VLOG << "scanning " << size << " elements with max " << nThreads << " work-items ";
+#endif
 	createPartialSums(size, nThreads);
 	cl_event evt = recursiveScan(input, size, nThreads, 0);
 
@@ -18,7 +20,9 @@ cl_event PrefixSum::run(cl_mem input, const uint size, uint nThreads)
 cl_event PrefixSum::run(cl_mem input, const uint size, uint nThreads, std::vector<cl_event> & lEvents)
 {
 	clear();
+#ifdef PRINT_DEBUG
 	VLOG << "scanning " << size << " elements with max " << nThreads << " work-items ";
+#endif	
 	createPartialSums(size, nThreads);
 
 	uint i = PrefixSum::events.size();
@@ -45,8 +49,9 @@ void PrefixSum::createPartialSums(uint size, uint wg){
 	uint nGroups = (uint) std::max(1.0f, ceil(((float) size)/(wg<<1)));
 	uint level = 0;
 	while(nGroups > 1){
+#ifdef PRINT_DEBUG
 		PLOG << "Creating partial sum buffer for " << nGroups << " entries in level " << level++ << std::endl;
-
+#endif
 		clever::vector<uint, 1> *partial = new clever::vector<uint, 1>(0, nGroups, ctx);
 		partialSums.push_back(partial);
 		nGroups = (uint) std::max(1.0f, ceil(((float) nGroups)/(wg<<1)));
@@ -66,24 +71,24 @@ uint getNextPowerOfTwo(uint n){
 }
 
 cl_event PrefixSum::recursiveScan(cl_mem input, uint size, uint wg, uint level){
-
+#ifdef PRINT_DEBUG
 	PLOG << "Recursively scanning " << size << " elements with max "
 			<< wg << " work-items ";
-
+#endif
 	// nGroups = size/(2 * workGroupSize)
 	uint nGroups = (uint) std::max(1.0f, ceil(((float) size)/(wg<<1)));
 	uint padding = (wg<<1) / MEMORY_BANK_COUNT;
-
+#ifdef PRINT_DEBUG
 	PLOG << "in " << nGroups << " work-groups" << std::endl;
-
+#endif
 	if(nGroups == 1){
 		//only one work-group needed, base case
 		uint localSize = std::max(1.0f, ceil(((float) size)/2));
 		localSize = getNextPowerOfTwo(localSize);
 
-
+#ifdef PRINT_DEBUG
 		PLOG << "Base case: global size = local size: " << localSize << std::endl;
-
+#endif
 		cl_event evt = prefixSumWG.run(input, size,
 			local_param(sizeof(cl_uint), (wg<<1)+padding),
 			range(localSize), range(localSize) );
@@ -93,15 +98,16 @@ cl_event PrefixSum::recursiveScan(cl_mem input, uint size, uint wg, uint level){
 		return evt;
 	} else {
 		//scan with sums into partial
+#ifdef PRINT_DEBUG
 		PLOG << "Recursive case: allocating " << nGroups << " partial sums ";
 		PLOG << "global size: " << (wg*nGroups) << " local size: " << wg << std::endl;
-
+#endif
 		cl_event evt = prefixSumPartial.run(input, size, partialSums[level]->get_mem(),
 				local_param(sizeof(cl_uint), (wg<<1)+padding),
 				range(wg*nGroups), range(wg) );
 
 		PrefixSum::events.push_back(evt);
-
+#ifdef PRINT_DEBUG
 		if(PROLIX){
 			ctx.finish_default_queue();
 
@@ -109,9 +115,9 @@ cl_event PrefixSum::recursiveScan(cl_mem input, uint size, uint wg, uint level){
 			transfer::download(*partialSums[level], lPartial,ctx, true);
 			printVector(lPartial);
 		}
-
+#endif
 		recursiveScan(partialSums[level]->get_mem(), nGroups, wg, level+1);
-
+#ifdef PRINT_DEBUG
 		if(PROLIX){
 			ctx.finish_default_queue();
 
@@ -122,7 +128,7 @@ cl_event PrefixSum::recursiveScan(cl_mem input, uint size, uint wg, uint level){
 
 		PLOG << "Adding " << nGroups << " partial sums to " << size << " inputs "
 				<< "global size: " << (wg*nGroups) << " local size: " << wg << std::endl;
-
+#endif
 		evt = prefixSumUniformAdd.run(input, size, partialSums[level]->get_mem(),
 				range(wg*nGroups), range(wg));
 

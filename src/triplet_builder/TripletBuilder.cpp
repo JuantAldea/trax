@@ -35,6 +35,8 @@
 #include <algorithms/TripletThetaPhiFilter.h>
 #include <algorithms/GridBuilder.h>
 
+#include <algorithms/TripletConnectivityTight.h>
+
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
@@ -54,6 +56,7 @@ clever::context * createContext(ExecutionParameters exec)
     LLOG << "Creating context for " << (exec.useCPU ? "CPU" : "GPGPU") << "...";
 
 //#define DEBUG
+#define CL_QUEUE_THREAD_LOCAL_EXEC_ENABLE_INTEL  (1<<31)
 #if defined(DEBUG) && defined(CL_QUEUE_THREAD_LOCAL_EXEC_ENABLE_INTEL)
 #define DEBUG_OCL CL_QUEUE_THREAD_LOCAL_EXEC_ENABLE_INTEL
 #else
@@ -267,7 +270,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             PairGeneratorBeamspot pairGen(*contx);
 
             runtime.pairGen.startWalltime();
-            Pairing  * pairs = pairGen.run(hits, geomSupplement, exec.threads, layerConfig, grid);
+            Pairing * pairs = pairGen.run(hits, geomSupplement, exec.threads, layerConfig, grid);
             runtime.pairGen.stopWalltime();
 
             TripletThetaPhiPredictor predictor(*contx);
@@ -283,6 +286,15 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             TrackletCollection * tracklets = tripletThetaPhi.run(hits, grid, *pairs, *tripletCandidates,
                                              exec.threads, layerConfig);
             runtime.tripletFilter.stopWalltime();
+            
+            /*******************************************/
+            
+            TripletConnectivityTight tripletConnectivityTight(*contx);
+            tripletConnectivityTight.run(*tracklets, exec.threads, true);
+
+            /*******************************************/
+
+            LOG << std::endl;
 
             //evaluate it
 
@@ -311,6 +323,8 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             TripletThetaPhiPredictor::clearEvents();
             TripletThetaPhiFilter::clearEvents();
             PrefixSum::clearEvents();
+            TripletConnectivityTight::clearEvents();
+            break;
         }
 
         delete edLoader;
@@ -397,7 +411,7 @@ int main(int argc, char *argv[])
     ("help", "produce help message")
     ("silent", "supress all messages from TripletFinder")
     ("verbose", "elaborate information")
-    ("prolix", "prolix output -- degrades performance as data is transferred from device")
+    ("(PROLIX)", "(PROLIX) output -- degrades performance as data is transferred from device")
     ("live", "live output -- degrades performance")
     ("cpu", "force running on cpu")
     ("testSuite", po::value<std::string>(&testSuiteFile),
@@ -440,13 +454,13 @@ int main(int argc, char *argv[])
     if (vm.count("verbose")) {
         exec.verbosity = Logger::cVERBOSE;
     }
-    if (vm.count("prolix")) {
+    if (vm.count("(PROLIX)")) {
         exec.verbosity = Logger::cPROLIX;
     }
     if (vm.count("live")) {
         exec.verbosity = Logger::cLIVE;
     }
-    if (vm.count("live") && vm.count("prolix")) {
+    if (vm.count("live") && vm.count("(PROLIX)")) {
         exec.verbosity = Logger::cLIVEPROLIX;
     }
     exec.verbosity = Logger::cLIVEPROLIX;
@@ -499,7 +513,6 @@ int main(int argc, char *argv[])
             for (uint e : events) {
                 for (uint t : threads) {
                     for (uint n : tracks) {
-
                         ExecutionParameters ep(exec); //clone default
                         EventDataLoadingParameters lp(loader);
 
@@ -509,7 +522,6 @@ int main(int argc, char *argv[])
                         lp.maxTracks = n;
 
                         executions.push_back(std::make_pair(ep, lp));
-
                     }
                 }
             }
@@ -549,10 +561,10 @@ int main(int argc, char *argv[])
     runtimeRecords.logPrint();
 
     std::stringstream outputFileRuntime;
-    outputFileRuntime << g_traxDir << "/runtime/" << "runtime." <<  getFilename(exec.configFile) <<
-                      (testSuiteFile != "" ? "." : "") << getFilename(testSuiteFile) << (exec.useCPU ? ".cpu" :
-                              ".gpu") <<
-                      ".csv";
+    outputFileRuntime << g_traxDir << "/runtime/" << "runtime."
+                      << getFilename(exec.configFile) << (testSuiteFile != "" ? "." : "")
+                      << getFilename(testSuiteFile) << (exec.useCPU ? ".cpu" : ".gpu")
+                      << ".csv";
 
     std::ofstream runtimeRecordsFile(outputFileRuntime.str(), std::ios::trunc);
     runtimeRecordsFile << runtimeRecords.csvDump();
@@ -571,5 +583,4 @@ int main(int argc, char *argv[])
     physicsRecordsFile.close();
 
     std::cout << Logger::getInstance();
-
 }

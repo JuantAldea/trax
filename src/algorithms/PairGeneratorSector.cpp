@@ -3,7 +3,7 @@
 
 
 Pairing * PairGeneratorSector::run(HitCollection & hits, const GeometrySupplement & geomSupplement,
-				uint nThreads, const TripletConfigurations & layerTriplets, const Grid & grid)
+				uint nThreads, const TripletConfigurations & layerTriplets, const Grid & grid, bool printPROLIX)
 		{
 
 	std::vector<uint> oracleOffset;
@@ -65,7 +65,7 @@ Pairing * PairGeneratorSector::run(HitCollection & hits, const GeometrySupplemen
 	PairGeneratorSector::events.push_back(evt);
 	LOG << "done" << std::endl;
 
-	if(PROLIX){
+	if((PROLIX) && printPROLIX){
 		PLOG << "Fetching prefix sum for pair gen...";
 		std::vector<uint> vPrefixSum(m_prefixSum.get_count());
 		transfer::download(m_prefixSum,vPrefixSum,ctx);
@@ -79,7 +79,7 @@ Pairing * PairGeneratorSector::run(HitCollection & hits, const GeometrySupplemen
 	}
 
 
-	if(PROLIX){
+	if((PROLIX) && printPROLIX){
 		PLOG << "Fetching oracle for pair gen...";
 		std::vector<uint> oracle(m_oracle.get_count());
 		transfer::download(m_oracle,oracle,ctx);
@@ -98,7 +98,7 @@ Pairing * PairGeneratorSector::run(HitCollection & hits, const GeometrySupplemen
 	uint nFoundPairs;
 	transfer::downloadScalar(m_prefixSum, nFoundPairs, ctx, true, m_prefixSum.get_count()-1, 1, &evt);
 
-	if(PROLIX){
+	if((PROLIX) && printPROLIX){
 		PLOG << "Fetching prefix sum for pair gen...";
 		std::vector<uint> vPrefixSum(m_prefixSum.get_count());
 		transfer::download(m_prefixSum,vPrefixSum,ctx);
@@ -132,7 +132,7 @@ Pairing * PairGeneratorSector::run(HitCollection & hits, const GeometrySupplemen
 	PairGeneratorSector::events.push_back(evt);
 	LOG << "done" << std::endl;
 
-	if(PROLIX){
+	if((PROLIX) && printPROLIX){
 		PLOG << "Fetching pairs...";
 		std::vector<uint2> pairs = hitPairs->getPairings();
 		PLOG <<"done[" << pairs.size() << "]" << std::endl;

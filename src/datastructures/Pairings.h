@@ -14,14 +14,14 @@ private:
 	mutable std::vector<uint> * lPairingOffsets;
 
 public:
-	clever::vector<uint2,1> pairing;
+	clever::vector<uint2, 1> pairing;
 	clever::vector<uint, 1> pairingOffsets;
 
 public:
 
 	Pairing(clever::context & ctext, const uint nTotalPairings, const uint nEvents, const uint nLayerTriplets)
 		: ctx(ctext), lPairing(NULL), lPairingOffsets(NULL),
-		  pairing(ctx, nTotalPairings),
+		  pairing(nTotalPairings, ctx),
 		  pairingOffsets(0 , nEvents*nLayerTriplets+1, ctx) {	}
 
 	const std::vector<uint> & getPairingOffsets() const {

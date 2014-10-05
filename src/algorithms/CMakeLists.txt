@@ -8,5 +8,5 @@ add_library(algorithms
 	PairGeneratorBeamspot.cpp
 	TripletThetaPhiPredictor.cpp
 	TripletThetaPhiFilter.cpp
-    #	TripletConnectivity.cpp
+    TripletConnectivityTight.cpp
 )

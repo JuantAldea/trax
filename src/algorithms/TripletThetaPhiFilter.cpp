@@ -9,7 +9,7 @@
 
 TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid & grid,
         const Pairing & pairs, const Pairing & tripletCandidates,
-        int nThreads, const TripletConfigurations & layerTriplets)
+        int nThreads, const TripletConfigurations & layerTriplets, bool printPROLIX)
 {
     LOG << "BEGIN TripletThetaPhiFilter" << std::endl;
     uint nTripletCandidates = tripletCandidates.pairing.get_count();
@@ -39,7 +39,7 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
     TripletThetaPhiFilter::events.push_back(evt);
     LOG << "done" << std::endl;
 
-    if (PROLIX) {
+    if ((PROLIX) && printPROLIX) {
         PLOG << "Fetching oracle...";
         std::vector<uint> oracle(m_oracle.get_count());
         transfer::download(m_oracle, oracle, ctx);
@@ -65,7 +65,7 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
     TripletThetaPhiFilter::events.push_back(evt);
     LOG << "done" << std::endl;
 
-    if (PROLIX) {
+    if ((PROLIX) && printPROLIX) {
         PLOG << "Fetching prefix sum...";
         std::vector<uint> cPrefixSum(m_prefixSum.get_count());
         transfer::download(m_prefixSum, cPrefixSum, ctx);
@@ -86,7 +86,7 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
                              1, &evt);
 
 
-    if (PROLIX) {
+    if ((PROLIX) && printPROLIX) {
         PLOG << "Fetching prefix sum...";
         std::vector<uint> cPrefixSum(m_prefixSum.get_count());
         transfer::download(m_prefixSum, cPrefixSum, ctx);
@@ -148,7 +148,7 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
     tracklets->transfer.fromDevice(ctx, *tracklets);
     LOG << "done[" << tracklets->size() << "]" << std::endl;
 
-    if (PROLIX) {
+    if ((PROLIX) && printPROLIX) {
         PLOG << "Tracklets: " << std::endl;
         for (uint i = 0; i < nFoundTriplets; ++i) {
             Tracklet tracklet(*tracklets, i);
@@ -157,7 +157,7 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
         }
     }
 
-    if (PROLIX) {
+    if ((PROLIX) && printPROLIX) {
         LOG << "OFFSETS BEFORE MONOTONIZE" << std::endl;
         LOG << "done[" << tripOffsetsNonMonotonized.size() << "]" << std::endl;
 

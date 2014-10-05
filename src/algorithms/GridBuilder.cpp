@@ -3,7 +3,7 @@
 #include <iostream>
 #include <iomanip>
 
-cl_ulong GridBuilder::run(HitCollection & hits, uint nThreads, const EventSupplement & eventSupplement, const LayerSupplement & layerSupplement, Grid & grid)
+cl_ulong GridBuilder::run(HitCollection & hits, uint nThreads, const EventSupplement & eventSupplement, const LayerSupplement & layerSupplement, Grid & grid, bool printPROLIX)
 {
 
 	//store buffers to input data
@@ -62,7 +62,7 @@ cl_ulong GridBuilder::run(HitCollection & hits, uint nThreads, const EventSupple
 
 	//download updated grid
 	grid.transfer.fromDevice(ctx,grid, &GridBuilder::events);
-	if(PROLIX){
+	if((PROLIX) && printPROLIX){
 		printGrid(grid);
 	}
 
@@ -149,8 +149,9 @@ cl_ulong GridBuilder::run(HitCollection & hits, uint nThreads, const EventSupple
 	//grid.transfer.fromDevice(ctx,grid, &events);
 	//printGrid(grid);
 	hits.transfer.fromDevice(ctx,hits, &GridBuilder::events);
-	if(PROLIX)
+	if((PROLIX) && printPROLIX){
 		verifyGrid(hits, grid);
+	}
 
 	//delete old buffers
 	ctx.release_buffer(x); ctx.release_buffer(y); ctx.release_buffer(z);

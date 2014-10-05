@@ -45,7 +45,7 @@ public:
 
     TrackletCollection * run(HitCollection & hits, const Grid & grid,
                              const Pairing & pairs, const Pairing & tripletCandidates,
-                             int nThreads, const TripletConfigurations & layerTriplets);
+                             int nThreads, const TripletConfigurations & layerTriplets, bool printProlix = false);
 
     KERNEL_CLASSP(filterCount,
                   oclDEFINES,

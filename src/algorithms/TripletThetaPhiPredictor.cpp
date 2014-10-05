@@ -10,7 +10,7 @@
 Pairing * TripletThetaPhiPredictor::run(HitCollection & hits, const DetectorGeometry & geom,
                                         const GeometrySupplement & geomSupplement, const Dictionary & dict,
                                         int nThreads, const TripletConfigurations & layerTriplets, const Grid & grid,
-                                        const Pairing & pairs)
+                                        const Pairing & pairs, bool printPROLIX)
 {
     PLOG << "BEGIN TripletThetaPhiPredictor" << std::endl;
     uint nPairs = pairs.pairing.get_count();
@@ -47,7 +47,7 @@ Pairing * TripletThetaPhiPredictor::run(HitCollection & hits, const DetectorGeom
     TripletThetaPhiPredictor::events.push_back(evt);
     LOG << "done" << std::endl;
 
-    if (PROLIX) {
+    if ((PROLIX) && printPROLIX) {
         PLOG << "Fetching prefix sum for prediction...";
         std::vector<uint> vPrefixSum(m_prefixSum.get_count());
         transfer::download(m_prefixSum, vPrefixSum, ctx);
@@ -63,11 +63,14 @@ Pairing * TripletThetaPhiPredictor::run(HitCollection & hits, const DetectorGeom
     PrefixSum prefixSum(ctx);
     evt = prefixSum.run(m_prefixSum.get_mem(), m_prefixSum.get_count(), nThreads,
                         TripletThetaPhiPredictor::events);
+    
     uint nFoundTripletCandidates;
     transfer::downloadScalar(m_prefixSum, nFoundTripletCandidates, ctx, true,
                              m_prefixSum.get_count() - 1, 1, &evt);
-
-    if (PROLIX) {
+    
+    LOG << "Triplet candidates found: " << nFoundTripletCandidates << std::endl;
+    
+    if ((PROLIX) && printPROLIX) {
         PLOG << "Fetching prefix sum for prediction...";
         std::vector<uint> vPrefixSum(m_prefixSum.get_count());
         transfer::download(m_prefixSum, vPrefixSum, ctx);
@@ -122,7 +125,7 @@ Pairing * TripletThetaPhiPredictor::run(HitCollection & hits, const DetectorGeom
     TripletThetaPhiPredictor::events.push_back(evt);
     LOG << "done" << std::endl;
 
-    if (PROLIX) {
+    if ((PROLIX) && printPROLIX) {
         PLOG << "Fetching triplet candidates...";
         std::vector<uint2> cands = m_triplets->getPairings();
         PLOG << "done[" << cands.size() << "]" << std::endl;

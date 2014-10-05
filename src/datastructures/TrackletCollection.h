@@ -42,7 +42,7 @@ public:
 			clever::Collection<TRACKLET_COLLECTION_ITEMS>(items),
 			trackletOffsets(0 , nEvents*nLayerTriplets+1, ctext),
 			ctx(ctext),
-			lTrackletOffsets(0)
+			lTrackletOffsets(NULL)
 	{
 
 	}
@@ -59,7 +59,8 @@ public:
 	}
 
 	void invalidate(){
-		delete lTrackletOffsets; lTrackletOffsets = NULL;
+		delete lTrackletOffsets;
+		lTrackletOffsets = NULL;
 	}
 
 	~TrackletCollection(){

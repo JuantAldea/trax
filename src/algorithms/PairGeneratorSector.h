@@ -36,7 +36,7 @@ public:
 }
 
 	Pairing * run(HitCollection & hits, const GeometrySupplement & geomSupplement,
-				uint nThreads, const TripletConfigurations & layerTriplets, const Grid & grid);
+				uint nThreads, const TripletConfigurations & layerTriplets, const Grid & grid, bool printProlix = false);
 
 	KERNEL_CLASSP( pairCount, oclDEFINES,
 
