@@ -9,4 +9,5 @@ add_library(algorithms
 	TripletThetaPhiPredictor.cpp
 	TripletThetaPhiFilter.cpp
     TripletConnectivityTight.cpp
+    TrackletCircleFitter.cpp
 )
