@@ -296,16 +296,19 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 
             //{int a; std::cout << "READKEY after release" << std::endl; std::cin >> a;}
             TripletConnectivityTight tripletConnectivityTight(*contx);
-            //tripletConnectivityTight.run(*tracklets, exec.threads, true);
             
-            auto connectableTrackletsPairIndices = tripletConnectivityTight.run(*tracklets, exec.threads, false);
+            // On average a 0.0256 cut on eta reduces the amount of triplet pairs a 33.7% (stdev 19.6)
+            float dEtaCut  = 0.0256;
+            auto connectableTrackletsPairIndices = tripletConnectivityTight.run(hits, *tracklets, dEtaCut, exec.threads, false);
+            //tripletConnectivityTight.run(hits, *tracklets, dEtaCut, exec.threads, true);
+            //std::cerr << tracklets->size() << std::endl;
             
             TrackletCircleFitter trackletCircleFitter(*contx);
             trackletCircleFitter.run(hits, *tracklets, *std::get<2>(connectableTrackletsPairIndices), exec.threads, true);
             
-            delete std::get<2>(connectableTrackletsPairIndices);
             delete std::get<0>(connectableTrackletsPairIndices);
             delete std::get<1>(connectableTrackletsPairIndices);
+            delete std::get<2>(connectableTrackletsPairIndices);
 
             /*******************************************/
 
@@ -340,7 +343,6 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             PrefixSum::clearEvents();
             TripletConnectivityTight::clearEvents();
             TrackletCircleFitter::clearEvents();
-            //break;
         }
 
         delete edLoader;
