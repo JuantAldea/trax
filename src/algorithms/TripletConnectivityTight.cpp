@@ -1,9 +1,8 @@
 #include "TripletConnectivityTight.h"
 
-#include <algorithm>
 
-
-void TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const uint nThreads, bool printProlix) const
+std::tuple<clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>* >
+TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const uint nThreads, bool printPROLIX) const
 {
     
     LOG << std::endl << "BEGIN TripletConnectivityTight" << std::endl;
@@ -15,7 +14,7 @@ void TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const u
     
     PLOG << "Initial tracklets: " << nTracklets << std::endl;
     
-    clever::vector<uint, 1> m_oracle(nOracleCount, ctx);
+    clever::vector<uint, 1> m_oracle(0, nOracleCount, ctx);
     clever::vector<uint, 1> m_trackletFollowerPrefixSum(0, nTracklets + 1, ctx);
     
     cl_event evt;
@@ -65,6 +64,7 @@ void TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const u
        PLOG << std::endl;
     }    
 */
+  
     PrefixSum prefixSum(ctx);
    
     evt = prefixSum.run(
@@ -88,9 +88,11 @@ void TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const u
         PLOG << std::endl;
     }
 */
+  
     LOG << "Running connectivity tight store kernel, producing " << nTrackletConnectablePairs << " tracklet pairs...";
-    clever::vector<uint, 1> m_connectableTripletBasis(nTrackletConnectablePairs, ctx);
-    clever::vector<uint, 1> m_connectableTripletFollowers(nTrackletConnectablePairs, ctx);
+
+    clever::vector<uint, 1> * m_connectableTripletBasis = new clever::vector<uint, 1>(nTrackletConnectablePairs, ctx);
+    clever::vector<uint, 1> * m_connectableTripletFollowers = new clever::vector<uint, 1>(nTrackletConnectablePairs, ctx);
 
     evt = tripletConnectivityTightStore.run(
         //input
@@ -100,8 +102,8 @@ void TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const u
         trackletsInitial.transfer.buffer(TrackletHit2()),
         m_trackletFollowerPrefixSum.get_mem(),
         //output
-        m_connectableTripletBasis.get_mem(),
-        m_connectableTripletFollowers.get_mem(),
+        m_connectableTripletBasis->get_mem(),
+        m_connectableTripletFollowers->get_mem(),
         //workload
         nTracklets,
         //thread config
@@ -109,22 +111,34 @@ void TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const u
        range(nThreads));
     TripletConnectivityTight::events.push_back(evt);
     LOG << "done." << std::endl;
-/*
+
     if(((PROLIX) && printPROLIX)){
         PLOG << "Fetching connectable tracklets pairs...";
-        std::vector<uint> vConnectableTripletBasis(m_connectableTripletBasis.get_count());
-        std::vector<uint> vConnectableTripletFollowers(m_connectableTripletFollowers.get_count());
-        transfer::download(m_connectableTripletBasis, vConnectableTripletBasis, ctx);
-        transfer::download(m_connectableTripletFollowers, vConnectableTripletFollowers, ctx);
+        std::vector<uint> vConnectableTripletBasis(m_connectableTripletBasis->get_count());
+        std::vector<uint> vConnectableTripletFollowers(m_connectableTripletFollowers->get_count());
+        transfer::download(*m_connectableTripletBasis, vConnectableTripletBasis, ctx);
+        transfer::download(*m_connectableTripletFollowers, vConnectableTripletFollowers, ctx);
         PLOG << "done" << std::endl;
         PLOG << "Tracklet connectable pairs: " << std::endl;
-        for (uint i = 0; i < m_connectableTripletFollowers.get_count(); i++) {
-            PLOG << "[" << i << "]" << '['<< vConnectableTripletBasis[i]
-                 << "-" << vConnectableTripletFollowers[i] << ']' << std::endl;
+        for (uint i = 0; i < m_connectableTripletFollowers->get_count(); i++) {
+            uint hit11 = trackletsInitial.getValue(TrackletHit1(), vConnectableTripletBasis[i]);
+            uint hit12 = trackletsInitial.getValue(TrackletHit2(), vConnectableTripletBasis[i]);
+            uint hit13 = trackletsInitial.getValue(TrackletHit3(), vConnectableTripletBasis[i]);
+            uint hit21 = trackletsInitial.getValue(TrackletHit1(), vConnectableTripletFollowers[i]);
+            uint hit22 = trackletsInitial.getValue(TrackletHit2(), vConnectableTripletFollowers[i]);
+            uint hit23 = trackletsInitial.getValue(TrackletHit3(), vConnectableTripletFollowers[i]);
+            PLOG << "[" << i << "]"
+                 << " "
+                 << '['<< vConnectableTripletBasis[i] << " ==> " << vConnectableTripletFollowers[i] << ']'
+                 << " <==> "
+                 << '[' << hit11 << '-' << hit12 << '-' << hit13 << ']'
+                 << " ==> "
+                 << '[' << hit21 << '-' << hit22 << '-' << hit23 << ']'
+                 << std::endl;
         }
         PLOG << std::endl;
     }
-*/
+
     // Fom here, we already have the triplet pairings that share two hits
     // Some triplets cannot aren't connectable already,
     // those that have the their oracle set to 0.
@@ -169,6 +183,7 @@ void TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const u
     
     TripletConnectivityTight::events.push_back(evt);
     LOG << "done" << std::endl;
+
     if (((PROLIX) && printPROLIX)) {
         PLOG << "Fetching oracle prefix sum...";
         std::vector<uint> cPrefixSum(m_prefixSum.get_count());
@@ -220,8 +235,9 @@ void TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const u
     uint nNonConnectableTracklets;
     transfer::downloadScalar(m_invOracle, nNonConnectableTracklets, ctx, true, m_invOracle.get_count() - 1, 1, &evt);    
     LOG << "done. Non-connectable Tracklets: " << nNonConnectableTracklets << std::endl;
-/*
-    if (((PROLIX) && printPROLIX)) {
+
+
+    if ((PROLIX) && printPROLIX) {
         PLOG << "Fetching oracle prefix sum...";
         std::vector<uint> vOracle(m_oracle.get_count());
         transfer::download(m_oracle, vOracle, ctx);
@@ -232,44 +248,64 @@ void TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const u
         }
         PLOG << std::endl;
     }
+/*
+    if (((PROLIX) && printPROLIX)) {
+        PLOG << "Fetching inversed oracle prefix sum...";
+        std::vector<uint> vInvOracle(m_invOracle.get_count());
+        transfer::download(m_invOracle, vInvOracle, ctx);
+        PLOG << "done" << std::endl;
+        PLOG << "Prefix sum: ";
+        for (auto i : vInvOracle) {
+            PLOG << i << " ; ";
+        }
+        PLOG << std::endl;
+    }
 */
+
     //Getting the indices of the connectable triplets
     LOG << "Running stream compaction for connectable tracklets over " << nTracklets << " tracklets...";
-    clever::vector<uint, 1> m_conectableTripletIndexes(nConnectableTracklets, ctx);
+    clever::vector<uint, 1> * m_conectableTripletIndexes = new clever::vector<uint, 1>(nConnectableTracklets, ctx);
     evt = streamCompactionGetValidIndexes.run(
         //input
         m_oracle.get_mem(),
         //output
-        m_conectableTripletIndexes.get_mem(),
+        m_conectableTripletIndexes->get_mem(),
         //workload
         m_oracle.get_count() - 1,
         //thread config
         range(nGroups * nThreads),
         range(nThreads));
     TripletConnectivityTight::events.push_back(evt);
-    LOG << "done. Produced " << m_conectableTripletIndexes.get_count() << " indexes of connectable tracklets..." << std::endl;
+    LOG << "done. Produced " << m_conectableTripletIndexes->get_count() << " indexes of connectable tracklets..." << std::endl;
+    
     
     //Getting the indices of the non-connectable triplets
+
     LOG << "Running stream compaction for non-connectable tracklets over " << nTracklets << " tracklets...";
-    clever::vector<uint, 1> m_nonConectableTripletIndexes(nNonConnectableTracklets, ctx);
-    evt = streamCompactionGetValidIndexes.run(
-        //input
-        m_invOracle.get_mem(),
-        //output
-        m_nonConectableTripletIndexes.get_mem(),
-        //workload
-        m_invOracle.get_count() - 1,
-        //thread config
-        range(nGroups * nThreads),
-        range(nThreads));
-    TripletConnectivityTight::events.push_back(evt);
-    LOG << "done. Produced " << m_nonConectableTripletIndexes.get_count() << " indexes of non-connectable tracklets..." << std::endl;
+
+    //TODO SIZE 0 SHOULD BE A VALID SIZE!!!!
+    clever::vector<uint, 1> * m_nonConectableTripletIndexes = NULL;
+    if (nNonConnectableTracklets > 0){
+        m_nonConectableTripletIndexes = new clever::vector<uint, 1>(nNonConnectableTracklets, ctx);
+        evt = streamCompactionGetValidIndexes.run(
+            //input
+            m_invOracle.get_mem(),
+            //output
+            m_nonConectableTripletIndexes->get_mem(),
+            //workload
+            m_invOracle.get_count() - 1,
+            //thread config
+            range(nGroups * nThreads),
+            range(nThreads));
+        TripletConnectivityTight::events.push_back(evt);
+        LOG << "done. Produced " << m_nonConectableTripletIndexes->get_count() << " indexes of non-connectable tracklets..." << std::endl;
+    }
 
 /*
     if(((PROLIX) && printPROLIX)){
         PLOG << "Fetching connectable triplet indexes...";
-        std::vector<uint> vConectableTripletIndexes(m_conectableTripletIndexes.get_count());
-        transfer::download(m_conectableTripletIndexes, vConectableTripletIndexes, ctx);
+        std::vector<uint> vConectableTripletIndexes(m_conectableTripletIndexes->get_count());
+        transfer::download(*m_conectableTripletIndexes, vConectableTripletIndexes, ctx);
         PLOG << "done" << std::endl;
         PLOG << "Indexes: ";
         for (auto i : vConectableTripletIndexes) {
@@ -278,52 +314,66 @@ void TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const u
         PLOG << std::endl;
     }
 */
+/*
+    if(((PROLIX) && printPROLIX)){
+        PLOG << "Fetching non-connectable triplet indexes...";
+        std::vector<uint> vNonConectableTripletIndexes(m_nonConectableTripletIndexes->get_count());
+        transfer::download(*m_nonConectableTripletIndexes, vNonConectableTripletIndexes, ctx);
+        PLOG << "done" << std::endl;
+        PLOG << "Indexes: ";
+        for (auto i : vNonConectableTripletIndexes) {
+            PLOG << i << " ; ";
+        }
+        PLOG << std::endl;
+    }
+*/
 
+#ifdef COMPACTION
     LOG << "Running stream filtering for connectable tracklets over " << nTracklets << " tracklets...";
-    clever::vector<uint, 1> m_conectableTripletH1(m_conectableTripletIndexes.get_count(), ctx);
-    clever::vector<uint, 1> m_conectableTripletH2(m_conectableTripletIndexes.get_count(), ctx);
-    clever::vector<uint, 1> m_conectableTripletH3(m_conectableTripletIndexes.get_count(), ctx);
+    clever::vector<uint, 1> m_conectableTripletH1(m_conectableTripletIndexes->get_count(), ctx);
+    clever::vector<uint, 1> m_conectableTripletH2(m_conectableTripletIndexes->get_count(), ctx);
+    clever::vector<uint, 1> m_conectableTripletH3(m_conectableTripletIndexes->get_count(), ctx);
 
     evt = streamCompactionFilter3Streams.run(
         //input
         trackletsInitial.transfer.buffer(TrackletHit1()),
         trackletsInitial.transfer.buffer(TrackletHit2()),
         trackletsInitial.transfer.buffer(TrackletHit3()),
-        m_conectableTripletIndexes.get_mem(),
+        m_conectableTripletIndexes->get_mem(),
         //output
         m_conectableTripletH1.get_mem(),
         m_conectableTripletH2.get_mem(),
         m_conectableTripletH3.get_mem(),
         //workload
-        m_conectableTripletIndexes.get_count(),
+        m_conectableTripletIndexes->get_count(),
         //config
         range(nGroups * nThreads),
         range(nThreads));
     TripletConnectivityTight::events.push_back(evt);
-    LOG << "done. Produced " << m_conectableTripletIndexes.get_count() << " tracklets..." << std::endl;
+    LOG << "done. Produced " << m_conectableTripletIndexes->get_count() << " tracklets..." << std::endl;
 
     LOG << "Running stream filtering for non-connectable tracklets over " << nTracklets << " tracklets...";
-    clever::vector<uint, 1> m_nonConectableTripletH1(m_nonConectableTripletIndexes.get_count(), ctx);
-    clever::vector<uint, 1> m_nonConectableTripletH2(m_nonConectableTripletIndexes.get_count(), ctx);
-    clever::vector<uint, 1> m_nonConectableTripletH3(m_nonConectableTripletIndexes.get_count(), ctx);
+    clever::vector<uint, 1> m_nonConectableTripletH1(m_nonConectableTripletIndexes->get_count(), ctx);
+    clever::vector<uint, 1> m_nonConectableTripletH2(m_nonConectableTripletIndexes->get_count(), ctx);
+    clever::vector<uint, 1> m_nonConectableTripletH3(m_nonConectableTripletIndexes->get_count(), ctx);
 
     evt = streamCompactionFilter3Streams.run(
         //input
         trackletsInitial.transfer.buffer(TrackletHit1()),
         trackletsInitial.transfer.buffer(TrackletHit2()),
         trackletsInitial.transfer.buffer(TrackletHit3()),
-        m_nonConectableTripletIndexes.get_mem(),
+        m_nonConectableTripletIndexes->get_mem(),
         //output
         m_nonConectableTripletH1.get_mem(),
         m_nonConectableTripletH2.get_mem(),
         m_nonConectableTripletH3.get_mem(),
         //workload
-        m_nonConectableTripletIndexes.get_count(),
+        m_nonConectableTripletIndexes->get_count(),
         //config
         range(nGroups * nThreads),
         range(nThreads));
     TripletConnectivityTight::events.push_back(evt);
-    LOG << "done. Produced " << m_nonConectableTripletIndexes.get_count() << " tracklets..." << std::endl;
+    LOG << "done. Produced " << m_nonConectableTripletIndexes->get_count() << " tracklets..." << std::endl;
 
     //Now we have indexes of triplets that are connectable and those that are not
     //Fit those triplets
@@ -332,8 +382,11 @@ void TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const u
     //Merge list of triplets rejected in the first phase and those of the second
 
     //Return the collection of rejected triplets and the collection of connectable triplets
-
+#endif
+    
     LOG << std::endl << "END TripletConnectivityTight" << std::endl;
 
-    return std::tuple<cl_mem, cl_mem, cl_mem
+    
+    return std::make_tuple(m_connectableTripletBasis, m_connectableTripletFollowers,
+                           m_conectableTripletIndexes, m_nonConectableTripletIndexes);
 }

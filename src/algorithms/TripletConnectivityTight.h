@@ -1,5 +1,7 @@
 #pragma once
 
+#include <tuple>
+
 #include <clever/clever.hpp>
 #include <datastructures/TrackletCollection.h>
 #include <datastructures/KernelWrapper.hpp>
@@ -44,7 +46,8 @@ public:
              << tripletConnectivityTightStore.getWorkGroupSize() << std::endl;
     }
 
-    void run(TrackletCollection &tracklets, const uint nThreads, bool printProlix = false) const;
+    std::tuple<clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>*>
+    run(TrackletCollection &tracklets, const uint nThreads, bool printPROLIX = false) const;
     
     // TODO Incorporate layer information.
     KERNEL_CLASS(tripletConnectivityTightCount,
