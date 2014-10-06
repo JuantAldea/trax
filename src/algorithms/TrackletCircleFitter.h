@@ -38,8 +38,7 @@ public:
             __global uint * const __restrict h2,
             __global uint * const __restrict validTrackletsIndices,
             //output
-            __global float * const __restrict tripletPt,
-            __global float * const __restrict tripletEta,
+            __global float * const __restrict tripletsPt,
             //workload
             const uint nValidTriplets)
     {
@@ -53,7 +52,9 @@ public:
         const uint innerHit = h0[triplet_index];
         const uint middleHit = h1[triplet_index];
         const uint outerHit = h2[triplet_index];
-
+        // TODO this code needs to be benchmarked. opencl float3 are actually float4
+        // so it might be wasting registers.
+        // It also looks like Nvida and AMD cards are scalar nowadays.
         const float3 hit0 = (float3)(hitX[innerHit], hitY[innerHit], hitZ[innerHit]);
 
         const float3 hit1 = (float3)(hitX[middleHit], hitY[middleHit], hitZ[middleHit]);
@@ -75,8 +76,8 @@ public:
         //TIP
         //const float2 circle_center = (float2)(-unit_n.x / (2 * unit_n.z), -unit_n.y / (2 * unit_n.z));
 
-        const float c = -(unit_n.x * pP0.x + unit_n.y * pP0.y + unit_n.z * pP0.z);
         //const float c = -dot(unit_n, pP0);
+        const float c = -(unit_n.x * pP0.x + unit_n.y * pP0.y + unit_n.z * pP0.z);
         const float unit_n_z_squared = unit_n.z * unit_n.z;
         const float circle_radius = sqrt((1 - unit_n_z_squared - 4 * c * unit_n.z) / (4 * unit_n_z_squared));
         // Ideal Magnetic Field [T] (-0,-0, 3.8112)
@@ -88,15 +89,9 @@ public:
         // 1 GeV/c = 5.344286×10^-19 J s/m (joule seconds per meter)
         const float GEV_C = 5.344286E-19;
         
-        tripletPt[triplet_index] = Q * BZ * (circle_radius * 1E-2) / GEV_C;
-        
-        // calculate eta
-        const float3 p = (float3)(hit2 - hit0);
-        const float t = p.z / sqrt(p.x * p.x + p.y * p.y);
-        
-        tripletEta[triplet_index] = asinh(t);
+        tripletsPt[triplet_index] = Q * BZ * (circle_radius * 1E-2) / GEV_C;
     },
     cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_mem,
-    cl_mem, cl_mem,
+    cl_mem,
     cl_uint);
 };

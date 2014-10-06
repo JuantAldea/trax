@@ -12,7 +12,6 @@ void TrackletCircleFitter::run(const HitCollection &hits,
     const uint nGroups = (uint) std::max(1.0f, ceil(((float) nTracklets) / nThreads));
     //const uint nGroups = (uint) std::max(1.0f, ceil(((float) nTracklets) / 1));
     clever::vector<float, 1> * const tripletPt  = new clever::vector<float, 1>(nTracklets, ctx);
-    clever::vector<float, 1> * const tripletEta = new clever::vector<float, 1>(nTracklets, ctx);
 
     cl_event evt;
     evt = trackletCircleFitter.run(
@@ -26,7 +25,6 @@ void TrackletCircleFitter::run(const HitCollection &hits,
             validTrackletsIndices.get_mem(),
             //output
             tripletPt->get_mem(),
-            tripletEta->get_mem(),
             //workload
             validTrackletsIndices.get_count(),
             //configuration
@@ -37,15 +35,12 @@ void TrackletCircleFitter::run(const HitCollection &hits,
     if(((PROLIX) && printPROLIX)){
         PLOG << "Fetching triplet Pt and Eta...";
         std::vector<float> vPt(tripletPt->get_count());
-        std::vector<float> vEta(tripletEta->get_count());
-        
         transfer::download(*tripletPt, vPt, ctx);
-        transfer::download(*tripletEta, vEta, ctx);
         
         PLOG << "done" << std::endl;
-        PLOG << "index, Pt, Eta" << std::endl;
+        PLOG << "index, Pt" << std::endl;
         for (uint i = 0; i < tripletPt->get_count(); i++) {
-            PLOG << i << " " << vPt[i] << ' '<< vEta[i] << std::endl;
+            PLOG << i << " " << vPt[i] << std::endl;
         }
     }
     
