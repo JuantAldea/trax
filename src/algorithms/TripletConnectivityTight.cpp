@@ -2,7 +2,7 @@
 
 
 std::tuple<clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>* >
-TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const uint nThreads, bool printPROLIX) const
+TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &trackletsInitial, const float dEtaCut, const uint nThreads, bool printPROLIX) const
 {
     
     LOG << std::endl << "BEGIN TripletConnectivityTight" << std::endl;
@@ -13,11 +13,44 @@ TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const uint n
     uint nGroups = (uint) std::max(1.0f, ceil(((float) nTracklets) / nThreads));
     
     PLOG << "Initial tracklets: " << nTracklets << std::endl;
+    cl_event evt;
     
+    LOG << "Running Triplet Eta Calculator kernel...";
+
+    clever::vector<float, 1> m_tripletEta(nTracklets, ctx);
+    
+    evt = tripletEtaCalculator.run(
+        //input
+        hits.transfer.buffer(GlobalX()),
+        hits.transfer.buffer(GlobalY()),
+        hits.transfer.buffer(GlobalZ()),
+        trackletsInitial.transfer.buffer(TrackletHit1()),
+        trackletsInitial.transfer.buffer(TrackletHit3()),
+        //output
+        m_tripletEta.get_mem(),
+        //workload
+        nTracklets,
+        //thread config
+       range(nGroups * nThreads),
+       range(nThreads));
+    TripletConnectivityTight::events.push_back(evt);
+    LOG << "done." << std::endl;
+
+    if (((PROLIX) && printPROLIX)){
+        PLOG << "Fetching oracle...";
+        std::vector<float> vTripletEta(m_tripletEta.get_count());
+        transfer::download(m_tripletEta, vTripletEta, ctx);
+        PLOG << "done" << std::endl;
+        PLOG << "Eta:" << std::endl;
+        for(auto i : vTripletEta){
+            PLOG << i << std::endl;
+        }
+        PLOG << std::endl;
+    }
+
     clever::vector<uint, 1> m_oracle(0, nOracleCount, ctx);
     clever::vector<uint, 1> m_trackletFollowerPrefixSum(0, nTracklets + 1, ctx);
     
-    cl_event evt;
     LOG << "Running connectivity tight count kernel...";
    
     evt = tripletConnectivityTightCount.run(
@@ -26,6 +59,8 @@ TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const uint n
         trackletsInitial.transfer.buffer(TrackletHit3()),
         trackletsInitial.transfer.buffer(TrackletHit1()),
         trackletsInitial.transfer.buffer(TrackletHit2()),
+        m_tripletEta.get_mem(),
+        dEtaCut,
         //output
         m_trackletFollowerPrefixSum.get_mem(),
         m_oracle.get_mem(),
@@ -34,7 +69,6 @@ TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const uint n
        range(nGroups * nThreads),
        range(nThreads));
     TripletConnectivityTight::events.push_back(evt);
-
     LOG << "done." << std::endl;
 /*
     if (((PROLIX) && printPROLIX)){
@@ -52,6 +86,7 @@ TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const uint n
         PLOG << std::endl;
     }
 */
+
 /*
     if (((PROLIX) && printPROLIX)){
         PLOG << "Fetching connectivity count...";
@@ -64,9 +99,8 @@ TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const uint n
        PLOG << std::endl;
     }    
 */
-  
+
     PrefixSum prefixSum(ctx);
-   
     evt = prefixSum.run(
         m_trackletFollowerPrefixSum.get_mem(),
         m_trackletFollowerPrefixSum.get_count(),
@@ -100,6 +134,8 @@ TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const uint n
         trackletsInitial.transfer.buffer(TrackletHit3()),
         trackletsInitial.transfer.buffer(TrackletHit1()),
         trackletsInitial.transfer.buffer(TrackletHit2()),
+        m_tripletEta.get_mem(),
+        dEtaCut,
         m_trackletFollowerPrefixSum.get_mem(),
         //output
         m_connectableTripletBasis->get_mem(),
@@ -235,7 +271,6 @@ TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const uint n
     uint nNonConnectableTracklets;
     transfer::downloadScalar(m_invOracle, nNonConnectableTracklets, ctx, true, m_invOracle.get_count() - 1, 1, &evt);    
     LOG << "done. Non-connectable Tracklets: " << nNonConnectableTracklets << std::endl;
-
 
     if ((PROLIX) && printPROLIX) {
         PLOG << "Fetching oracle prefix sum...";
@@ -374,7 +409,6 @@ TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const uint n
         range(nThreads));
     TripletConnectivityTight::events.push_back(evt);
     LOG << "done. Produced " << m_nonConectableTripletIndexes->get_count() << " tracklets..." << std::endl;
-
     //Now we have indexes of triplets that are connectable and those that are not
     //Fit those triplets
     //Recalculate connectivity with harder constraints
@@ -383,7 +417,10 @@ TripletConnectivityTight::run(TrackletCollection &trackletsInitial, const uint n
 
     //Return the collection of rejected triplets and the collection of connectable triplets
 #endif
-    
+    std::cerr << nTracklets << ' ' << nConnectableTracklets
+              << ' ' << nNonConnectableTracklets
+              << ' ' << nTrackletConnectablePairs
+              << std::endl;
     LOG << std::endl << "END TripletConnectivityTight" << std::endl;
 
     

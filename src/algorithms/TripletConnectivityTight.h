@@ -4,6 +4,7 @@
 
 #include <clever/clever.hpp>
 #include <datastructures/TrackletCollection.h>
+#include <datastructures/HitCollection.h>
 #include <datastructures/KernelWrapper.hpp>
 
 #include <algorithms/PrefixSum.h>
@@ -33,6 +34,7 @@ class TripletConnectivityTight : public KernelWrapper<TripletConnectivityTight>
 public:
     TripletConnectivityTight(clever::context & context) :
         KernelWrapper(context),
+        tripletEtaCalculator(context),
         tripletConnectivityTightCount(context),
         tripletConnectivityTightStore(context),
         streamCompactionGetValidIndexes(context),
@@ -47,20 +49,60 @@ public:
     }
 
     std::tuple<clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>*>
-    run(TrackletCollection &tracklets, const uint nThreads, bool printPROLIX = false) const;
+    run(const HitCollection &hits, TrackletCollection &tracklets, const float dEtaCut, const uint nThreads, bool printPROLIX = false) const;
     
+
+    KERNEL_CLASS(tripletEtaCalculator,
+                 __kernel void tripletEtaCalculator(
+                    //input
+                     __global const float * const __restrict hitX,
+                     __global const float * const __restrict hitY,
+                     __global const float * const __restrict hitZ,
+                     __global const uint * const __restrict tripletInnerHitId,
+                     __global const uint * const __restrict tripletOuterHitId,
+                     //output
+                     __global float * const __restrict tripletEta,
+                     //workload
+                     const uint nTracklets)
+    {
+        const size_t tripletIndex = get_global_id(0);
+
+        if (tripletIndex >= nTracklets) {
+            return;
+        }
+        
+        const uint hitInnerIndex = tripletInnerHitId[tripletIndex];
+        const uint hitOuterIndex = tripletOuterHitId[tripletIndex];
+
+        float3 hitInner = (float3)(hitX[hitInnerIndex], hitY[hitInnerIndex], hitZ[hitInnerIndex]);
+        float3 hitOuter = (float3)(hitX[hitOuterIndex], hitY[hitOuterIndex], hitZ[hitOuterIndex]);
+        float3 p = (float3)(hitOuter - hitInner);
+        
+        const float t = p.z / sqrt(p.x * p.x + p.y * p.y);
+        
+        tripletEta[tripletIndex] = asinh(t);
+    },
+    cl_mem, cl_mem, cl_mem, cl_mem, cl_mem,
+    cl_mem,
+    cl_uint);
+
+
     // TODO Incorporate layer information.
     KERNEL_CLASS(tripletConnectivityTightCount,
                  __kernel void tripletConnectivityTightCount(
+                     //input
                      __global const uint * const __restrict hitsBasisH1,
                      __global const uint * const __restrict hitsBasisH2,
                      __global const uint * const __restrict hitsFollowersH0,
                      __global const uint * const __restrict hitsFollowersH1,
+                     __global const float * const __restrict tripletsEta,
+                     const float dEtaCut,
                      //output
                      //connectivityCount holds the number of followers
                      //for a given triplet.
                      __global uint * const __restrict connectivityCount,
                      __global uint * const __restrict connectivityOracle,
+                     //workload
                      const uint nTracklets)
     {
         const size_t tripletIndex = get_global_id(0);
@@ -71,11 +113,14 @@ public:
 
         const uint hitIndexInner = hitsBasisH1[tripletIndex];
         const uint hitIndexOuter = hitsBasisH2[tripletIndex];
-        
+        const float localTripletEta = tripletsEta[tripletIndex];
+
         uint connectivityCountLocal = 0;
         for (uint i = 0; i < nTracklets; i++) {
             const bool test = (hitIndexInner == hitsFollowersH0[i])
-                            * (hitIndexOuter == hitsFollowersH1[i]);
+                            * (hitIndexOuter == hitsFollowersH1[i])
+                            * (fabs(localTripletEta - tripletsEta[i]) < dEtaCut);
+            
             connectivityCountLocal += test;
             //TODO should I add an if?            
             //atomic_or(&connectivityOracle[i / sizeof(uint)], test << (i % sizeof(uint)));
@@ -89,7 +134,9 @@ public:
         //atomic_or(&connectivityOracle[tripletIndex / sizeof(uint)], (connectivityCountLocal > 0) << (tripletIndex % sizeof(uint)));
         atomic_or(&connectivityOracle[tripletIndex], connectivityCountLocal > 0);
     },
-    cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_uint);
+    cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_float,
+    cl_mem, cl_mem,
+    cl_uint);
 
     KERNEL_CLASS(tripletConnectivityTightStore,
                  __kernel void tripletConnectivityTightStore(
@@ -98,6 +145,8 @@ public:
                      __global const uint * const __restrict hitsBasisH2,
                      __global const uint * const __restrict hitsFollowersH0,
                      __global const uint * const __restrict hitsFollowersH1,
+                     __global const float * const __restrict tripletsEta,
+                     const float dEtaCut,
                      __global const uint * const __restrict connectivityPrefixSum,
                      //output
                      __global uint * const __restrict baseTriplet,
@@ -113,14 +162,16 @@ public:
 
         const uint hitIndexInner = hitsBasisH1[tripletIndex];
         const uint hitIndexOuter = hitsBasisH2[tripletIndex];
+        const float localTripletEta = tripletsEta[tripletIndex];
+
         uint storeOffset = connectivityPrefixSum[tripletIndex];
         const uint storeOffsetNextTriplet = connectivityPrefixSum[tripletIndex + 1];
         
         //connectivityOracle not needed, vality given by storeOffsets difference
         for (uint i = 0; (i < nTracklets) * (storeOffset < storeOffsetNextTriplet); i++) {
             const bool test = (hitIndexInner == hitsFollowersH0[i]) 
-                              * (hitIndexOuter == hitsFollowersH1[i]);
-            
+                              * (hitIndexOuter == hitsFollowersH1[i])
+                              * (fabs(localTripletEta - tripletsEta[i]) < dEtaCut);
             // the same position will be overwritten until it is valid
             // meaning no thread divergence here.
             baseTriplet[storeOffset] = tripletIndex;
@@ -128,7 +179,7 @@ public:
             storeOffset += test;
         }
     },
-    cl_mem, cl_mem, cl_mem, cl_mem, cl_mem,
+    cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_float, cl_mem,
     cl_mem, cl_mem,
     cl_uint);
     
