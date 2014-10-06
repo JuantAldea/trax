@@ -36,6 +36,7 @@
 #include <algorithms/GridBuilder.h>
 
 #include <algorithms/TripletConnectivityTight.h>
+#include <algorithms/TrackletCircleFitter.h>
 
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
@@ -96,7 +97,6 @@ clever::context * createContext(ExecutionParameters exec)
 std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec,
         EventDataLoadingParameters loader, GridConfig gridConfig, clever::context * contx)
 {
-
     RuntimeRecords runtimeRecords;
     PhysicsRecords physicsRecords;
 
@@ -200,8 +200,8 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             uint evtGroupSize = std::min(exec.eventGrouping, lastEvent - event);
 
             //initialize datastructures
-            EventSupplement eventSupplement(evtGroupSize);
-            LayerSupplement layerSupplement(loader.maxLayer, evtGroupSize);
+            EventSupplement *eventSupplement = new EventSupplement(evtGroupSize);
+            LayerSupplement *layerSupplement = new LayerSupplement(loader.maxLayer, evtGroupSize);
 
             gridConfig.nLayers = loader.maxLayer;
             gridConfig.nEvents = evtGroupSize;
@@ -218,19 +218,19 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 
                 LOG << "Started processing Event " << pEvent.eventnumber() << " LumiSection "
                     << pEvent.lumisection() << " Run " << pEvent.runnumber() << std::endl;
-                validTracks[iEvt] = hits.addEvent(pEvent, geom, eventSupplement, iEvt, layerSupplement,
+                validTracks[iEvt] = hits.addEvent(pEvent, geom, *eventSupplement, iEvt, *layerSupplement,
                                                   layerConfig, loader.maxTracks, loader.onlyTracks);
 
                 totalValidTracks += validTracks[iEvt].size();
                 LOG << "Loaded " << validTracks[iEvt].size()
                     << " tracks with minPt " << loader.minPt
-                    << " GeV and " << eventSupplement[iEvt].getNHits()
+                    << " GeV and " << (*eventSupplement)[iEvt].getNHits()
                     << " hits" << std::endl;
 
                 if (VERBOSE) {
                     for (uint i = 1; i <= loader.maxLayer; ++i) {
-                        VLOG << "Layer " << i << ": " << layerSupplement[iEvt * loader.maxLayer + i - 1].getNHits()
-                             << " hits" << "\t Offset: " << layerSupplement[iEvt * loader.maxLayer + i - 1].getOffset()
+                        VLOG << "Layer " << i << ": " << (*layerSupplement)[iEvt * loader.maxLayer + i - 1].getNHits()
+                             << " hits" << "\t Offset: " << (*layerSupplement)[iEvt * loader.maxLayer + i - 1].getOffset()
                              << std::endl;
                     }
                 }
@@ -247,14 +247,14 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             //transer hits to gpu
             hits.transfer.initBuffers(*contx, hits);
             hits.transfer.toDevice(*contx, hits);
+                        
+            //transferring layer supplement
+            eventSupplement->transfer.initBuffers(*contx, *eventSupplement);
+            eventSupplement->transfer.toDevice(*contx, *eventSupplement);
 
             //transferring layer supplement
-            eventSupplement.transfer.initBuffers(*contx, eventSupplement);
-            eventSupplement.transfer.toDevice(*contx, eventSupplement);
-
-            //transferring layer supplement
-            layerSupplement.transfer.initBuffers(*contx, layerSupplement);
-            layerSupplement.transfer.toDevice(*contx, layerSupplement);
+            layerSupplement->transfer.initBuffers(*contx, *layerSupplement);
+            layerSupplement->transfer.toDevice(*contx, *layerSupplement);
 
             //initializating grid
             grid.transfer.initBuffers(*contx, grid);
@@ -263,7 +263,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             GridBuilder gridBuilder(*contx);
 
             runtime.buildGrid.startWalltime();
-            gridBuilder.run(hits, exec.threads, eventSupplement, layerSupplement, grid);
+            gridBuilder.run(hits, exec.threads, *eventSupplement, *layerSupplement, grid);
             runtime.buildGrid.stopWalltime();
 
             //run it
@@ -288,9 +288,24 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             runtime.tripletFilter.stopWalltime();
             
             /*******************************************/
-            
+            //{int a; std::cout << "READKEY before release" << std::endl; std::cin >> a;}
+            //contx->release_buffer(layerSupplement->transfer.get_mem());
+            //contx->release_buffer(eventSupplement->transfer.get_mem());
+            //layerSupplement->transfer.release(*layerSupplement);
+            //eventSupplement->transfer.release(*eventSupplement);
+
+            //{int a; std::cout << "READKEY after release" << std::endl; std::cin >> a;}
             TripletConnectivityTight tripletConnectivityTight(*contx);
-            tripletConnectivityTight.run(*tracklets, exec.threads, true);
+            //tripletConnectivityTight.run(*tracklets, exec.threads, true);
+            
+            auto connectableTrackletsPairIndices = tripletConnectivityTight.run(*tracklets, exec.threads, false);
+            
+            TrackletCircleFitter trackletCircleFitter(*contx);
+            trackletCircleFitter.run(hits, *tracklets, *std::get<2>(connectableTrackletsPairIndices), exec.threads, true);
+            
+            delete std::get<2>(connectableTrackletsPairIndices);
+            delete std::get<0>(connectableTrackletsPairIndices);
+            delete std::get<1>(connectableTrackletsPairIndices);
 
             /*******************************************/
 
@@ -324,15 +339,17 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             TripletThetaPhiFilter::clearEvents();
             PrefixSum::clearEvents();
             TripletConnectivityTight::clearEvents();
-            break;
+            TrackletCircleFitter::clearEvents();
+            //break;
         }
 
         delete edLoader;
+        //{int a; std::cout << "READKEY Out1" << std::endl; std::cin >> a;}
 
     } //destruction order block
 
     //delete contx;
-
+    //{int a; std::cout << "READKEY Out2" << std::endl; std::cin >> a;}
     return std::make_pair(runtimeRecords, physicsRecords);
 }
 
@@ -565,7 +582,11 @@ int main(int argc, char *argv[])
                       << getFilename(exec.configFile) << (testSuiteFile != "" ? "." : "")
                       << getFilename(testSuiteFile) << (exec.useCPU ? ".cpu" : ".gpu")
                       << ".csv";
-
+    
+    std::stringstream outputDirRuntime;
+    outputDirRuntime << g_traxDir << "/runtime/" << getFilename(exec.configFile);
+    boost::filesystem::create_directories(outputDirRuntime.str());
+    
     std::ofstream runtimeRecordsFile(outputFileRuntime.str(), std::ios::trunc);
     runtimeRecordsFile << runtimeRecords.csvDump();
     runtimeRecordsFile.close();
@@ -583,4 +604,5 @@ int main(int argc, char *argv[])
     physicsRecordsFile.close();
 
     std::cout << Logger::getInstance();
+    //{int a; std:: cout << "EXIT" << std::endl; std::cin >>  a; }
 }
