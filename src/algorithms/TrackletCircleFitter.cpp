@@ -1,0 +1,53 @@
+#include "TrackletCircleFitter.h"
+
+void TrackletCircleFitter::run(const HitCollection &hits,
+                               const TrackletCollection &tracklets,
+                               const clever::vector<uint, 1> &validTrackletsIndices,
+                               const uint nThreads,
+                               bool printPROLIX) const
+{
+    LOG << std::endl << "BEGIN TrackletCircleFitter" << std::endl;
+    
+    const uint nTracklets = tracklets.size();
+    const uint nGroups = (uint) std::max(1.0f, ceil(((float) nTracklets) / nThreads));
+    //const uint nGroups = (uint) std::max(1.0f, ceil(((float) nTracklets) / 1));
+    clever::vector<float, 1> * const tripletPt  = new clever::vector<float, 1>(nTracklets, ctx);
+    clever::vector<float, 1> * const tripletEta = new clever::vector<float, 1>(nTracklets, ctx);
+
+    cl_event evt;
+    evt = trackletCircleFitter.run(
+            //input
+            hits.transfer.buffer(GlobalX()),
+            hits.transfer.buffer(GlobalY()),
+            hits.transfer.buffer(GlobalZ()),
+            tracklets.transfer.buffer(TrackletHit1()),
+            tracklets.transfer.buffer(TrackletHit2()),
+            tracklets.transfer.buffer(TrackletHit3()),
+            validTrackletsIndices.get_mem(),
+            //output
+            tripletPt->get_mem(),
+            tripletEta->get_mem(),
+            //workload
+            validTrackletsIndices.get_count(),
+            //configuration
+            range(nGroups * nThreads),
+            range(nThreads));
+    TrackletCircleFitter::events.push_back(evt);
+    
+    if(((PROLIX) && printPROLIX)){
+        PLOG << "Fetching triplet Pt and Eta...";
+        std::vector<float> vPt(tripletPt->get_count());
+        std::vector<float> vEta(tripletEta->get_count());
+        
+        transfer::download(*tripletPt, vPt, ctx);
+        transfer::download(*tripletEta, vEta, ctx);
+        
+        PLOG << "done" << std::endl;
+        PLOG << "index, Pt, Eta" << std::endl;
+        for (uint i = 0; i < tripletPt->get_count(); i++) {
+            PLOG << i << " " << vPt[i] << ' '<< vEta[i] << std::endl;
+        }
+    }
+    
+    LOG << std::endl << "END TrackletCircleFitter" << std::endl;
+}
