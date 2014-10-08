@@ -410,9 +410,6 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
     TripletConnectivityTight::events.push_back(evt);
     LOG << "done. Produced " << m_nonConectableTripletIndexes->get_count() << " tracklets..." << std::endl;
     //Now we have indexes of triplets that are connectable and those that are not
-    //Fit those triplets
-    //Recalculate connectivity with harder constraints
-    //Refilter triplets
     //Merge list of triplets rejected in the first phase and those of the second
 
     //Return the collection of rejected triplets and the collection of connectable triplets

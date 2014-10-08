@@ -13,15 +13,6 @@ using namespace clever;
 using namespace std;
 
 /*
- This class contains the infrastructure and kernel to compute the connectivity quantity for
- triplets. During this process the compatible tracklets which can form a complete track are
- counted and the number is stored with the triplet.
-
- Input:
- - buffer A holding Triplets to compute : read / write
- - buffer B holding Tripltes to check for connectivity ( can be the same as above ) : read only
- - range to start and end the connectivity search on buffer B
-
  possible todos:
  - improve performance by using local caching of the connectivity quantity
  - more complex tests ( fitted trajectory, theta / phi values of triptles )
@@ -183,6 +174,12 @@ public:
     cl_mem, cl_mem,
     cl_uint);
     
+
+    //This filtering uses the prefix sums, its not the quickest way
+    //of filtering by predicate but it is stable ie, it preserves
+    //the original ordering between elements
+    // a quicker but non-stable option could to use warp aggregated
+    // atomics version
     KERNEL_CLASS(streamCompactionGetValidIndexes,
                  __kernel void streamCompactionGetValidIndexes(
                     //input
@@ -213,17 +210,17 @@ public:
                     __global const uint * const __restrict stream1,
                     __global const uint * const __restrict stream2,
                     __global const uint * const __restrict stream3,
-                    __global const uint * const __restrict validIndexes,
+                    __global const uint * const __restrict indexes,
                     //output
                     __global uint * const __restrict filteredStream1,
                     __global uint * const __restrict filteredStream2,
                     __global uint * const __restrict filteredStream3,
                     //work load
-                    const uint nValidIndexes)
+                    const uint nIndexes)
     {
         const size_t gid = get_global_id(0);
 
-        if (gid >= nValidIndexes) {
+        if (gid >= nIndexes) {
             return;
         }
         
@@ -231,9 +228,9 @@ public:
         //probably it's even better to call the kernel three
         //times as it will trash the caches less.
         // TO BE MEASURED
-        filteredStream1[gid] = stream1[validIndexes[gid]];
-        filteredStream2[gid] = stream2[validIndexes[gid]];
-        filteredStream3[gid] = stream3[validIndexes[gid]];
+        filteredStream1[gid] = stream1[indexes[gid]];
+        filteredStream2[gid] = stream2[indexes[gid]];
+        filteredStream3[gid] = stream3[indexes[gid]];
     },
     cl_mem, cl_mem, cl_mem, cl_mem, 
     cl_mem, cl_mem, cl_mem,
