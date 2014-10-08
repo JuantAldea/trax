@@ -37,6 +37,7 @@
 
 #include <algorithms/TripletConnectivityTight.h>
 #include <algorithms/TrackletCircleFitter.h>
+#include <algorithms/CellularAutomaton.h>
 
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
@@ -303,9 +304,15 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             //tripletConnectivityTight.run(hits, *tracklets, dEtaCut, exec.threads, true);
             //std::cerr << tracklets->size() << std::endl;
             
+            // TODO filter the stream here, we dont want gaps neither for the fitting nor for the CA.
             TrackletCircleFitter trackletCircleFitter(*contx);
-            trackletCircleFitter.run(hits, *tracklets, *std::get<2>(connectableTrackletsPairIndices), exec.threads, true);
+            auto tripletPt  = trackletCircleFitter.run(hits, *tracklets, *std::get<2>(connectableTrackletsPairIndices), exec.threads, false);
             
+            CellularAutomaton cellularAutomaton(*contx);
+            
+            cellularAutomaton.run(*std::get<0>(connectableTrackletsPairIndices), *std::get<1>(connectableTrackletsPairIndices), *tripletPt,
+                exec.threads, true);
+
             delete std::get<0>(connectableTrackletsPairIndices);
             delete std::get<1>(connectableTrackletsPairIndices);
             delete std::get<2>(connectableTrackletsPairIndices);
@@ -343,6 +350,8 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             PrefixSum::clearEvents();
             TripletConnectivityTight::clearEvents();
             TrackletCircleFitter::clearEvents();
+            CellularAutomaton::clearEvents();
+            break;
         }
 
         delete edLoader;
