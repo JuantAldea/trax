@@ -20,11 +20,11 @@ public:
     {
     }
     
-    void run(const HitCollection &hits,
-             const TrackletCollection &tracklets,
-             const clever::vector<uint, 1> &validTrackletsIndices,
-             const uint nThreads,
-             bool printPROLIX = false) const;
+    clever::vector<float, 1>* run(const HitCollection &hits,
+                                  const TrackletCollection &tracklets,
+                                  const clever::vector<uint, 1> &validTrackletsIndices,
+                                  const uint nThreads,
+                                  bool printPROLIX = false) const;
 
 
     KERNEL_CLASS(trackletCircleFitter,
@@ -76,8 +76,8 @@ public:
         //TIP
         //const float2 circle_center = (float2)(-unit_n.x / (2 * unit_n.z), -unit_n.y / (2 * unit_n.z));
 
-        //const float c = -dot(unit_n, pP0);
-        const float c = -(unit_n.x * pP0.x + unit_n.y * pP0.y + unit_n.z * pP0.z);
+        const float c = -dot(unit_n, pP0);
+        //const float c = -(unit_n.x * pP0.x + unit_n.y * pP0.y + unit_n.z * pP0.z);
         const float unit_n_z_squared = unit_n.z * unit_n.z;
         const float circle_radius = sqrt((1 - unit_n_z_squared - 4 * c * unit_n.z) / (4 * unit_n_z_squared));
         // Ideal Magnetic Field [T] (-0,-0, 3.8112)

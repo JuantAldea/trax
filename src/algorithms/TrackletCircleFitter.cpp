@@ -1,6 +1,7 @@
 #include "TrackletCircleFitter.h"
 
-void TrackletCircleFitter::run(const HitCollection &hits,
+clever::vector<float, 1>*
+TrackletCircleFitter::run(const HitCollection &hits,
                                const TrackletCollection &tracklets,
                                const clever::vector<uint, 1> &validTrackletsIndices,
                                const uint nThreads,
@@ -45,4 +46,5 @@ void TrackletCircleFitter::run(const HitCollection &hits,
     }
     
     LOG << std::endl << "END TrackletCircleFitter" << std::endl;
+    return tripletPt;
 }
