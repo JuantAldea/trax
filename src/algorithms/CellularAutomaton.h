@@ -183,6 +183,8 @@ public:
             const __global uint * const __restrict basisIndexes,
             //output
             __global uint * const __restrict followerBestBasis,
+            //TODO do this bit-wise
+            __global bool * const __restrict basisBelongsToTrack,
             //workload
             const uint nTriplets)
     {
@@ -204,6 +206,7 @@ public:
             minPtIndex =  minPtIndex * !test + basisIndexes[i] * test;
         }
         followerBestBasis[tripletIndex] = minPtIndex;
+        basisBelongsToTrack[minPtIndex] = true;
     },
     
     cl_mem, cl_mem, cl_mem, cl_mem, cl_mem,
