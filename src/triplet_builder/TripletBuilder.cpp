@@ -306,12 +306,14 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             
             // TODO filter the stream here, we dont want gaps neither for the fitting nor for the CA.
             TrackletCircleFitter trackletCircleFitter(*contx);
-            auto tripletPt  = trackletCircleFitter.run(hits, *tracklets, *std::get<2>(connectableTrackletsPairIndices), exec.threads, false);
+            
+            auto tripletPt = trackletCircleFitter.run(hits, *tracklets,
+                *std::get<2>(connectableTrackletsPairIndices), exec.threads, false);
             
             CellularAutomaton cellularAutomaton(*contx);
-            
-            cellularAutomaton.run(*std::get<0>(connectableTrackletsPairIndices), *std::get<1>(connectableTrackletsPairIndices), *tripletPt,
-                exec.threads, true);
+            cellularAutomaton.run(*std::get<0>(connectableTrackletsPairIndices),
+                                  *std::get<1>(connectableTrackletsPairIndices),
+                                  *tripletPt, exec.threads, true);
 
             delete std::get<0>(connectableTrackletsPairIndices);
             delete std::get<1>(connectableTrackletsPairIndices);
