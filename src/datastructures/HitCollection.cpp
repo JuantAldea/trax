@@ -5,10 +5,12 @@
 
 HitCollection::HitCollection(const std::vector<PB_Event::PEvent *>& events)
 {
-	for ( auto e : events )
+    /*
+    for ( auto e : events )
 	{
-		//addEvent(*e, DetectorGeometry(), LayerSupplement(0 , 0));
+		addEvent(*e, DetectorGeometry(), LayerSupplement(0 , 0));
 	}
+    */
 
 }
 
