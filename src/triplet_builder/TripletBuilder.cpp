@@ -314,7 +314,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             cellularAutomaton.run(*std::get<0>(connectableTrackletsPairIndices),
                                   *std::get<1>(connectableTrackletsPairIndices),
                                   *tripletPt, exec.threads, true);
-
+                                  
             delete std::get<0>(connectableTrackletsPairIndices);
             delete std::get<1>(connectableTrackletsPairIndices);
             delete std::get<2>(connectableTrackletsPairIndices);

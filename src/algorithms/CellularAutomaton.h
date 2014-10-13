@@ -34,35 +34,42 @@ public:
     KERNEL_CLASS(iteration,
         __kernel void iteration(
             //input
-            const __global uint * const __restrict tripletA,
-            const __global uint * const __restrict tripletB,
-            const __global uint * const __restrict currentState,
+            const __global uint * const __restrict tripletsBasis,
+            const __global uint * const __restrict tripletsFollowers,
+            const __global uint * const __restrict currentStates,
             //TODO ?
             //__global uint * const __restrict currentLivingCells,
             //output
-            __global uint * const __restrict nextState,
+            __global uint * const __restrict nextStates,
             __global uint * const __restrict livingCells,
             //workload
             const uint nTripletPairs)
     {
-        const size_t gid = get_global_id(0);
+        const size_t tripletPair = get_global_id(0);
 
-        if (gid >= nTripletPairs) {
+        if (tripletPair >= nTripletPairs) {
             return;
         }
 
         //const uint tripletIndexA = tripletA[gid];
-        const uint tripletIndexB = tripletB[gid];
-        const uint stateB = currentState[tripletIndexB];
-        const uint test = currentState[tripletA[gid]] == stateB;
-        //TODO surround atomics by if?
-        if(test){
-            const uint old = atomic_max(&(nextState[tripletIndexB]), stateB + test);
-            if (old < stateB + test){
-                atomic_or(&(livingCells[tripletIndexB]), test);
-                //updatedTripletsPrefixSum[tripletIndexB] = 1;
-            }
-        }
+        const uint tripletFollower = tripletsFollowers[tripletPair];
+        const uint stateFollower = currentStates[tripletFollower];
+        const bool sameStateTest = currentStates[tripletsBasis[tripletPair]] == stateFollower;
+        //printf("BEFORE: %u %u", nextStates[tripletFollower],  stateFollower + sameStateTest);
+        uint old = atomic_max(&(nextStates[tripletFollower]), stateFollower + sameStateTest);
+        atomic_or(&(livingCells[tripletFollower]), sameStateTest);
+        //printf("before: %u %u\n", nextStates[tripletFollower],  stateFollower + sameStateTest);
+
+    /*
+        printf("%lu, (%u %u): (%u %u) %d -> (old:%u %u) %u !!! %u %u\n", 
+            tripletPair, 
+            tripletsBasis[tripletPair], tripletFollower,
+            currentStates[tripletsBasis[tripletPair]], stateFollower, sameStateTest,
+            old, nextStates[tripletFollower],
+            stateFollower + sameStateTest,
+            a, old2);
+    */
+    
     },
     cl_mem, cl_mem, cl_mem,
     cl_mem, cl_mem,
@@ -125,12 +132,15 @@ public:
         }
         //this could be stored on a vector to have the offsets already and do not need
         //to call atomic_inc again in the store phase
-        const uint followerTriplet = tripletsFollowers[tripletPair];
-        if (tripletsStatus[tripletsBasis[tripletPair]] + 1 != tripletsStatus[followerTriplet]){
+        const uint tripletFollower = tripletsFollowers[tripletPair];
+  
+        if (tripletsStatus[tripletsBasis[tripletPair]] + 1 != tripletsStatus[tripletFollower]){
             return;
         }
 
-        atomic_inc(&(followerBasisCount[followerTriplet]));
+        atomic_inc(&(followerBasisCount[tripletFollower]));
+        //uint storeOffset = atomic_inc(&(followerBasisCount[tripletFollower]));
+        //printf("STORE OFFSETA: TP-GPU#%lu [%u] %u -> %u\n", tripletPair, storeOffset + 1, tripletsBasis[tripletPair], tripletFollower);
     },
     cl_mem, cl_mem, cl_mem,
     cl_mem,
@@ -143,8 +153,8 @@ public:
             const __global uint * const __restrict tripletsFollowers,
             const __global uint * const __restrict tripletsStatus,
             const __global float * const __restrict tripletsPt,
-            //I/O, but the output is useless
-            __global uint * const __restrict followerBasisCountPrefixSum,
+            //I/O, but the output is useless (will be the inclusive prefix sum actually)
+            __global uint * const __restrict followerBasisCountPrefixSum ,
             //output
             __global float * const __restrict ptDiff,
             __global uint * const __restrict basisIndexes,
@@ -156,18 +166,18 @@ public:
         if (tripletPair >= nTripletPairs) {
             return;
         }
-
+        
         const uint tripletBasis = tripletsBasis[tripletPair];
         const uint tripletFollower = tripletsFollowers[tripletPair];
-                
-        if (tripletsStatus[tripletBasis] + 1 != tripletsStatus[tripletFollower]){
+        
+        if (tripletsStatus[tripletsBasis[tripletPair]] + 1 != tripletsStatus[tripletFollower]){
             return;
         }
         
         uint storeOffset = atomic_inc(&(followerBasisCountPrefixSum[tripletFollower]));
-        
-        ptDiff[storeOffset] = fabs(tripletsPt[tripletBasis] - tripletsPt[tripletFollower]);
+        //printf("STORE OFFSETA: #%lu [%u] %u %u\n", tripletPair*0,  0*storeOffset, tripletFollower, tripletBasis);
         basisIndexes[storeOffset] = tripletBasis;
+        ptDiff[storeOffset] = fabs(tripletsPt[tripletBasis] - tripletsPt[tripletFollower]);
     },
     
     cl_mem, cl_mem, cl_mem, cl_mem, cl_mem,
@@ -183,8 +193,7 @@ public:
             const __global uint * const __restrict basisIndexes,
             //output
             __global uint * const __restrict followerBestBasis,
-            //TODO do this bit-wise
-            __global bool * const __restrict basisBelongsToTrack,
+            __global uint * const __restrict tripletIsBestBasisForFollower,
             //workload
             const uint nTriplets)
     {
@@ -196,20 +205,26 @@ public:
 
         const uint begin = followerBasisCountPrefixSum[tripletIndex];
         const uint end = followerBasisCountPrefixSum[tripletIndex + 1];
+        
+        if(begin == end){
+            return;
+        }
+
         float minPt = followerBasisPtDifference[begin];
         uint minPtIndex = basisIndexes[begin];
         
         for(uint i = begin + 1; i < end; i++){
             float ptDiff = followerBasisPtDifference[i];
-            bool test = ptDiff < minPt;
+            uint test = ptDiff < minPt;
             minPt = minPt * !test + ptDiff * test;
             minPtIndex =  minPtIndex * !test + basisIndexes[i] * test;
         }
+        
         followerBestBasis[tripletIndex] = minPtIndex;
-        basisBelongsToTrack[minPtIndex] = true;
+        tripletIsBestBasisForFollower[minPtIndex] = 1;
     },
     
-    cl_mem, cl_mem, cl_mem, cl_mem, cl_mem,
+    cl_mem, cl_mem, cl_mem,
     cl_mem, cl_mem,
     cl_uint);
 };
