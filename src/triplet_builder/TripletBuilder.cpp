@@ -289,35 +289,39 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             runtime.tripletFilter.stopWalltime();
             
             /*******************************************/
-            //{int a; std::cout << "READKEY before release" << std::endl; std::cin >> a;}
-            //contx->release_buffer(layerSupplement->transfer.get_mem());
-            //contx->release_buffer(eventSupplement->transfer.get_mem());
-            //layerSupplement->transfer.release(*layerSupplement);
-            //eventSupplement->transfer.release(*eventSupplement);
 
-            //{int a; std::cout << "READKEY after release" << std::endl; std::cin >> a;}
+
+            // On average a dEta = 0.0256 cut reduces the amount of triplets pairs by a 33.7% (stdev 19.6)            
             TripletConnectivityTight tripletConnectivityTight(*contx);
-            
-            // On average a 0.0256 cut on eta reduces the amount of triplet pairs a 33.7% (stdev 19.6)
             float dEtaCut  = 0.0256;
+            runtime.tripletConnectivity.startWalltime();
             auto connectableTrackletsPairIndices = tripletConnectivityTight.run(hits, *tracklets, dEtaCut, exec.threads, false);
+            runtime.tripletConnectivity.stopWalltime();
+            
             //tripletConnectivityTight.run(hits, *tracklets, dEtaCut, exec.threads, true);
             //std::cerr << tracklets->size() << std::endl;
             
             // TODO filter the stream here, we dont want gaps neither for the fitting nor for the CA.
+            runtime.trackletCircleFitter.startWalltime();
             TrackletCircleFitter trackletCircleFitter(*contx);
+            auto tripletPt = trackletCircleFitter.run(hits, *tracklets, *std::get<2>(connectableTrackletsPairIndices), exec.threads, false);
+            runtime.trackletCircleFitter.stopWalltime();
             
-            auto tripletPt = trackletCircleFitter.run(hits, *tracklets,
-                *std::get<2>(connectableTrackletsPairIndices), exec.threads, false);
+            runtime.cellularAutomaton.startWalltime();
             
             CellularAutomaton cellularAutomaton(*contx);
             cellularAutomaton.run(*std::get<0>(connectableTrackletsPairIndices),
                                   *std::get<1>(connectableTrackletsPairIndices),
-                                  *tripletPt, exec.threads, true);
-                                  
+                                  *tripletPt,
+                                  *std::get<2>(connectableTrackletsPairIndices),
+                                  exec.threads, false);
+
+            runtime.cellularAutomaton.stopWalltime();
+
             delete std::get<0>(connectableTrackletsPairIndices);
             delete std::get<1>(connectableTrackletsPairIndices);
             delete std::get<2>(connectableTrackletsPairIndices);
+            delete std::get<3>(connectableTrackletsPairIndices);
 
             /*******************************************/
 
