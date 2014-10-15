@@ -16,7 +16,7 @@ class TrackletCircleFitter : public KernelWrapper<TrackletCircleFitter>
 public:
     TrackletCircleFitter(clever::context & context) :
         KernelWrapper(context),
-        trackletCircleFitter(context)
+        trackletCircleFitterStore(context)
     {
     }
     
@@ -27,8 +27,8 @@ public:
                                   bool printPROLIX = false) const;
 
 
-    KERNEL_CLASS(trackletCircleFitter,
-        __kernel void trackletCircleFitter(
+    KERNEL_CLASS(trackletCircleFitterStore,
+        __kernel void trackletCircleFitterStore(
             //input
             __global float * const __restrict hitX,
             __global float * const __restrict hitY,

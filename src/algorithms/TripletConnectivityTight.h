@@ -25,13 +25,13 @@ class TripletConnectivityTight : public KernelWrapper<TripletConnectivityTight>
 public:
     TripletConnectivityTight(clever::context & context) :
         KernelWrapper(context),
-        tripletEtaCalculator(context),
+        tripletEtaCalculatorStore(context),
         tripletConnectivityTightCount(context),
         tripletConnectivityTightStore(context),
-        streamCompactionGetValidIndexes(context),
-        streamCompactionFilter3Streams(context),
-        predicateInversionInPlace(context),
-        predicateInversion(context)
+        streamCompactionGetValidIndexesStore(context),
+        streamCompactionFilter3StreamsStore(context),
+        predicateInversionInPlaceStore(context),
+        predicateInversionStore(context)
     {
         PLOG << "tripletConnectivityTightCount WorkGroupSize: "
              << tripletConnectivityTightCount.getWorkGroupSize() << std::endl
@@ -43,8 +43,8 @@ public:
     run(const HitCollection &hits, TrackletCollection &tracklets, const float dEtaCut, const uint nThreads, bool printPROLIX = false) const;
     
 
-    KERNEL_CLASS(tripletEtaCalculator,
-                 __kernel void tripletEtaCalculator(
+    KERNEL_CLASS(tripletEtaCalculatorStore,
+                 __kernel void tripletEtaCalculatorStore(
                     //input
                      __global const float * const __restrict hitX,
                      __global const float * const __restrict hitY,
@@ -113,17 +113,25 @@ public:
                             * (fabs(localTripletEta - tripletsEta[i]) < dEtaCut);
             
             connectivityCountLocal += test;
-            //TODO should I add an if?            
-            //atomic_or(&connectivityOracle[i / sizeof(uint)], test << (i % sizeof(uint)));
-            atomic_or(&connectivityOracle[i], test);
+
+            //protecting this atomic_or with the if reduces the kernel time form 60ms to 16
+            if(test){
+                //atomic_or(&connectivityOracle[i / sizeof(uint)], test << (i % sizeof(uint)));
+                //atomic_or(&connectivityOracle[i], test);
+                //given that this will always set to 1, is the atomic really needed?
+                atomic_or(&connectivityOracle[i], 1);
+                //connectivityOracle[i] = 1;
+            }
         }
 
         connectivityCount[tripletIndex] = connectivityCountLocal;
         
-        //TODO should I add an if? 
-        //what is worst divergence or spare atomics?
         //atomic_or(&connectivityOracle[tripletIndex / sizeof(uint)], (connectivityCountLocal > 0) << (tripletIndex % sizeof(uint)));
-        atomic_or(&connectivityOracle[tripletIndex], connectivityCountLocal > 0);
+        if(connectivityCountLocal){
+            //atomic_or(&connectivityOracle[tripletIndex], connectivityCountLocal > 0);
+            atomic_or(&connectivityOracle[tripletIndex], 1);
+            //connectivityOracle[tripletIndex] = 1;
+        }
     },
     cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_float,
     cl_mem, cl_mem,
@@ -178,10 +186,10 @@ public:
     //This filtering uses the prefix sums, its not the quickest way
     //of filtering by predicate but it is stable ie, it preserves
     //the original ordering between elements
-    // a quicker but non-stable option could to use warp aggregated
-    // atomics version
-    KERNEL_CLASS(streamCompactionGetValidIndexes,
-                 __kernel void streamCompactionGetValidIndexes(
+    // a quicker but non-stable option could be made using warp aggregated
+    // atomics.
+    KERNEL_CLASS(streamCompactionGetValidIndexesStore,
+                 __kernel void streamCompactionGetValidIndexesStore(
                     //input
                     __global const uint * const __restrict predicatePrefixSum,
                     //output
@@ -204,8 +212,8 @@ public:
     cl_mem,
     cl_uint);
 
-    KERNEL_CLASS(streamCompactionFilter3Streams,
-                __kernel void streamCompactionFilter3Streams(
+    KERNEL_CLASS(streamCompactionFilter3StreamsStore,
+                __kernel void streamCompactionFilter3StreamsStore(
                     //input
                     __global const uint * const __restrict stream1,
                     __global const uint * const __restrict stream2,
@@ -236,8 +244,8 @@ public:
     cl_mem, cl_mem, cl_mem,
     cl_uint);
 
-    KERNEL_CLASS(predicateInversionInPlace,
-                __kernel void predicateInversionInPlace(
+    KERNEL_CLASS(predicateInversionInPlaceStore,
+                __kernel void predicateInversionInPlaceStore(
                     //input
                     __global uint * const predicate,
                     //output
@@ -254,8 +262,8 @@ public:
     cl_mem,
     cl_uint);
 
-    KERNEL_CLASS(predicateInversion,
-                __kernel void predicateInversion(
+    KERNEL_CLASS(predicateInversionStore,
+                __kernel void predicateInversionStore(
                     //input
                     __global const uint * const __restrict predicate,
                     //output

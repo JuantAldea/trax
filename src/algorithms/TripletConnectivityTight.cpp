@@ -19,7 +19,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
 
     clever::vector<float, 1> m_tripletEta(nTracklets, ctx);
     
-    evt = tripletEtaCalculator.run(
+    evt = tripletEtaCalculatorStore.run(
         //input
         hits.transfer.buffer(GlobalX()),
         hits.transfer.buffer(GlobalY()),
@@ -70,6 +70,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
        range(nThreads));
     TripletConnectivityTight::events.push_back(evt);
     LOG << "done." << std::endl;
+
 /*
     if (((PROLIX) && printPROLIX)){
         PLOG << "Fetching oracle...";
@@ -100,6 +101,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
     }    
 */
 
+    uint nTrackletConnectablePairs;
     PrefixSum prefixSum(ctx);
     evt = prefixSum.run(
         m_trackletFollowerPrefixSum.get_mem(),
@@ -108,7 +110,6 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
         TripletConnectivityTight::events);
     TripletConnectivityTight::events.push_back(evt);
 
-    uint nTrackletConnectablePairs;
     transfer::downloadScalar(m_trackletFollowerPrefixSum, nTrackletConnectablePairs, ctx, true, m_trackletFollowerPrefixSum.get_count() - 1, 1, &evt);
     PLOG << "Counted a total of" << nTrackletConnectablePairs << " connectable triplet pairs."<< std::endl;
 /*
@@ -127,6 +128,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
 
     clever::vector<uint, 1> * m_connectableTripletBasis = new clever::vector<uint, 1>(nTrackletConnectablePairs, ctx);
     clever::vector<uint, 1> * m_connectableTripletFollowers = new clever::vector<uint, 1>(nTrackletConnectablePairs, ctx);
+
 
     evt = tripletConnectivityTightStore.run(
         //input
@@ -234,7 +236,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
 */
     LOG << "Inverting connectivity oracle...";
     clever::vector<uint, 1> m_invOracle(m_oracle.get_count(), ctx);
-    evt = predicateInversion.run(
+    evt = predicateInversionStore.run(
         //input
         m_oracle.get_mem(),
         //output
@@ -300,7 +302,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
     //Getting the indices of the connectable triplets
     LOG << "Running stream compaction for connectable tracklets over " << nTracklets << " tracklets...";
     clever::vector<uint, 1> * m_conectableTripletIndexes = new clever::vector<uint, 1>(nConnectableTracklets, ctx);
-    evt = streamCompactionGetValidIndexes.run(
+    evt = streamCompactionGetValidIndexesStore.run(
         //input
         m_oracle.get_mem(),
         //output
@@ -322,7 +324,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
     clever::vector<uint, 1> * m_nonConectableTripletIndexes = NULL;
     if (nNonConnectableTracklets > 0){
         m_nonConectableTripletIndexes = new clever::vector<uint, 1>(nNonConnectableTracklets, ctx);
-        evt = streamCompactionGetValidIndexes.run(
+        evt = streamCompactionGetValidIndexesStore.run(
             //input
             m_invOracle.get_mem(),
             //output
@@ -369,7 +371,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
     clever::vector<uint, 1> m_conectableTripletH2(m_conectableTripletIndexes->get_count(), ctx);
     clever::vector<uint, 1> m_conectableTripletH3(m_conectableTripletIndexes->get_count(), ctx);
 
-    evt = streamCompactionFilter3Streams.run(
+    evt = streamCompactionFilter3StreamsStore.run(
         //input
         trackletsInitial.transfer.buffer(TrackletHit1()),
         trackletsInitial.transfer.buffer(TrackletHit2()),
@@ -392,7 +394,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
     clever::vector<uint, 1> m_nonConectableTripletH2(m_nonConectableTripletIndexes->get_count(), ctx);
     clever::vector<uint, 1> m_nonConectableTripletH3(m_nonConectableTripletIndexes->get_count(), ctx);
 
-    evt = streamCompactionFilter3Streams.run(
+    evt = streamCompactionFilter3StreamsStore.run(
         //input
         trackletsInitial.transfer.buffer(TrackletHit1()),
         trackletsInitial.transfer.buffer(TrackletHit2()),
@@ -414,10 +416,13 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
 
     //Return the collection of rejected triplets and the collection of connectable triplets
 #endif
+    
+    /*
     std::cerr << nTracklets << ' ' << nConnectableTracklets
               << ' ' << nNonConnectableTracklets
               << ' ' << nTrackletConnectablePairs
               << std::endl;
+    */
     LOG << std::endl << "END TripletConnectivityTight" << std::endl;
 
     

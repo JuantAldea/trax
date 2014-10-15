@@ -15,7 +15,7 @@ TrackletCircleFitter::run(const HitCollection &hits,
     clever::vector<float, 1> * const tripletPt  = new clever::vector<float, 1>(nTracklets, ctx);
 
     cl_event evt;
-    evt = trackletCircleFitter.run(
+    evt = trackletCircleFitterStore.run(
             //input
             hits.transfer.buffer(GlobalX()),
             hits.transfer.buffer(GlobalY()),
