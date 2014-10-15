@@ -14,6 +14,9 @@
 #include <algorithms/TripletThetaPhiPredictor.h>
 #include <algorithms/TripletThetaPhiFilter.h>
 #include <algorithms/PrefixSum.h>
+#include <algorithms/TripletConnectivityTight.h>
+#include <algorithms/TrackletCircleFitter.h>
+#include <algorithms/CellularAutomaton.h>
 
 #include "utils.h"
 
@@ -80,6 +83,11 @@ public:
 	tIOInfo write;
 
 	tRuntimeInfo buildGrid, pairGen, tripletPredict, tripletFilter;
+	/****/
+	tRuntimeInfo tripletConnectivity;
+	tRuntimeInfo cellularAutomaton;
+	tRuntimeInfo trackletCircleFitter;
+	/****/
 
 	RuntimeRecord(uint events_, uint layers_, uint layerTriplets_,
 					uint hits_,  uint tracks_, uint threads_) {
@@ -127,6 +135,12 @@ public:
 	tRuntimeInfo pairGenMean, pairGenVar;
 	tRuntimeInfo tripletPredictMean, tripletPredictVar;
 	tRuntimeInfo tripletFilterMean, tripletFilterVar;
+
+	/******/
+	tRuntimeInfo tripletConnectivityMean, tripletConnectivityVar;
+	tRuntimeInfo trackletCircleFitterMean, trackletCircleFitterVar;
+	tRuntimeInfo cellularAutomatonMean, cellularAutomatonVar;
+	/******/
 
 	RuntimeRecordClass(uint events_, uint layers_, uint layerTriplets_,
 			uint hits_,  uint tracks_, uint threads_) {

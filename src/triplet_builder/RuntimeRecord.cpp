@@ -156,7 +156,25 @@ void RuntimeRecord::fillRuntimes(const clever::context & ctx) {
 		tKernelEvent t = ctx.getKernelPerf(e);
 		fillInfo(t, tripletFilter);
 	}
+	/****************/
+	//triplet connectivity
+	for(cl_event e : TripletConnectivityTight::events){
+		tKernelEvent t = ctx.getKernelPerf(e);
+		fillInfo(t, tripletConnectivity);
+	}
 
+	//Circle fitter
+	for(cl_event e : TrackletCircleFitter::events){
+		tKernelEvent t = ctx.getKernelPerf(e);
+		fillInfo(t, trackletCircleFitter);
+	}
+
+	//Cellular automaton
+	for(cl_event e : CellularAutomaton::events){
+		tKernelEvent t = ctx.getKernelPerf(e);
+		fillInfo(t, cellularAutomaton);
+	}
+	/****************/
 }
 
 void RuntimeRecord::logPrint() const {
@@ -168,8 +186,11 @@ void RuntimeRecord::logPrint() const {
 	LOG << "Total IO: " << totalIO.prettyPrint() << std::endl;
 	VLOG << "Read: " << read.prettyPrint() << std::endl;
 	VLOG << "Write: " << write.prettyPrint() << std::endl;
+	/*****************/
+	tRuntimeInfo totalRuntime = buildGrid + pairGen + tripletPredict + tripletFilter
+							+ tripletConnectivity + trackletCircleFitter + cellularAutomaton;
+	/*****************/
 
-	tRuntimeInfo totalRuntime = buildGrid + pairGen + tripletPredict + tripletFilter;
 	LOG << "Total runtime: ";
 	LOG << totalRuntime.prettyPrint() << std::endl;
 	LOG << "Wall time -- per event: " << Utils::nsToMs(totalRuntime.walltime PER events) << " ms"
@@ -200,7 +221,24 @@ void RuntimeRecord::logPrint() const {
 		 << " -- per layerTriplet " << Utils::nsToMs(tripletFilter.walltime PER (events*layerTriplets)) << " ms"
 		 << " -- per track: " << Utils::nsToMs(tripletFilter.walltime PER tracks) << " ms" << std::endl;
 
-
+    /*********************/
+	VLOG << std::endl << "Triplet connectivity: ";
+	VLOG << tripletConnectivity.prettyPrint() << std::endl;
+	VLOG << "Wall time -- per event: " << Utils::nsToMs(tripletConnectivity.walltime PER events) << " ms"
+		 << " -- per layerTriplet " << Utils::nsToMs(tripletConnectivity.walltime PER (events*layerTriplets)) << " ms"
+		 << " -- per track: " << Utils::nsToMs(tripletConnectivity.walltime PER tracks) << " ms" << std::endl;VLOG << std::endl << "Triplet connectivity: ";
+	
+	VLOG << trackletCircleFitter.prettyPrint() << std::endl;
+	VLOG << "Wall time -- per event: " << Utils::nsToMs(trackletCircleFitter.walltime PER events) << " ms"
+		 << " -- per layerTriplet " << Utils::nsToMs(trackletCircleFitter.walltime PER (events*layerTriplets)) << " ms"
+		 << " -- per track: " << Utils::nsToMs(trackletCircleFitter.walltime PER tracks) << " ms" << std::endl;
+	
+	VLOG << std::endl << "Cellular automaton: ";
+	VLOG << cellularAutomaton.prettyPrint() << std::endl;
+	VLOG << "Wall time -- per event: " << Utils::nsToMs(cellularAutomaton.walltime PER events) << " ms"
+		 << " -- per layerTriplet " << Utils::nsToMs(cellularAutomaton.walltime PER (events*layerTriplets)) << " ms"
+		 << " -- per track: " << Utils::nsToMs(cellularAutomaton.walltime PER tracks) << " ms" << std::endl;
+	/*********************/
 }
 
 void RuntimeRecordClass::logPrint() const {
@@ -215,8 +253,13 @@ void RuntimeRecordClass::logPrint() const {
 	VLOG << "Read: " << readMean.prettyPrint(toVar(readVar)) << std::endl;
 	VLOG << "Write: " << writeMean.prettyPrint(toVar(writeVar)) << std::endl;
 
-	tRuntimeInfo totalRuntimeMean = buildGridMean + pairGenMean + tripletPredictMean + tripletFilterMean;
-	tRuntimeInfo totalRuntimeVar = buildGridVar + pairGenVar + tripletPredictVar + tripletFilterVar;
+	/*****************/
+	tRuntimeInfo totalRuntimeMean = buildGridMean + pairGenMean + tripletPredictMean + tripletFilterMean
+								+ tripletConnectivityMean + trackletCircleFitterMean + cellularAutomatonMean;
+	tRuntimeInfo totalRuntimeVar = buildGridVar + pairGenVar + tripletPredictVar + tripletFilterVar
+								+ tripletConnectivityVar + trackletCircleFitterVar + cellularAutomatonVar;
+	/*****************/
+
 	LOG << "Total runtime: ";
 	LOG << totalRuntimeMean.prettyPrint(toVar(totalRuntimeVar)) << std::endl;
 	LOG << "Wall time -- per event: " << Utils::nsToMs(totalRuntimeMean.walltime PER events) << " ms"
@@ -246,8 +289,25 @@ void RuntimeRecordClass::logPrint() const {
 	VLOG << "Wall time -- per event: " << Utils::nsToMs(tripletFilterMean.walltime PER events) << " ms"
 		 << " -- per layerTriplet " << Utils::nsToMs(tripletFilterMean.walltime PER (events*layerTriplets)) << " ms"
 		 << " -- per track: " << Utils::nsToMs(tripletFilterMean.walltime PER tracks) << " ms" << std::endl;
-
-
+	/******************/
+    VLOG << std::endl << "Triplet connectivity: ";
+	VLOG << tripletConnectivityMean.prettyPrint(toVar(tripletConnectivityVar)) << std::endl;
+	VLOG << "Wall time -- per event: " << Utils::nsToMs(tripletConnectivityMean.walltime PER events) << " ms"
+		 << " -- per layerTriplet " << Utils::nsToMs(tripletConnectivityMean.walltime PER (events*layerTriplets)) << " ms"
+		 << " -- per track: " << Utils::nsToMs(tripletConnectivityMean.walltime PER tracks) << " ms" << std::endl;
+	
+	VLOG << std::endl << "Tracklet circle fitter: ";
+	VLOG << trackletCircleFitterMean.prettyPrint(toVar(trackletCircleFitterVar)) << std::endl;
+	VLOG << "Wall time -- per event: " << Utils::nsToMs(trackletCircleFitterMean.walltime PER events) << " ms"
+		 << " -- per layerTriplet " << Utils::nsToMs(trackletCircleFitterMean.walltime PER (events*layerTriplets)) << " ms"
+		 << " -- per track: " << Utils::nsToMs(trackletCircleFitterMean.walltime PER tracks) << " ms" << std::endl;
+	
+	VLOG << std::endl << "Cellular automaton: ";
+	VLOG << cellularAutomatonMean.prettyPrint(toVar(cellularAutomatonVar)) << std::endl;
+	VLOG << "Wall time -- per event: " << Utils::nsToMs(cellularAutomatonMean.walltime PER events) << " ms"
+		 << " -- per layerTriplet " << Utils::nsToMs(cellularAutomatonMean.walltime PER (events*layerTriplets)) << " ms"
+		 << " -- per track: " << Utils::nsToMs(cellularAutomatonMean.walltime PER tracks) << " ms" << std::endl;
+	/******************/
 }
 
 void RuntimeRecords::logPrint() const{
@@ -269,12 +329,26 @@ bool RuntimeRecord::operator==(const RuntimeRecord & r) const{
 
 std::string RuntimeRecord::csvDump() const {
 	std::stringstream s;
+	/*************/
+	tRuntimeInfo total = buildGrid + pairGen + tripletPredict + tripletFilter
+						+ tripletConnectivity + trackletCircleFitter + cellularAutomaton;
+	/*************/
+	//header
+	s << Utils::csv({events, layers, layerTriplets, threads, hits, tracks}) << SEP;
+	//IO
+	s << read.csvDump() << SEP << write.csvDump() << SEP;
+	//runtime
+	s << buildGrid.csvDump() << SEP
+	  << pairGen.csvDump() << SEP
+	  << tripletPredict.csvDump() << SEP
+	  << tripletFilter.csvDump() << SEP
+	  /************/
+	  << tripletConnectivity.csvDump() << SEP
+	  << trackletCircleFitter.csvDump() << SEP
+	  << cellularAutomaton.csvDump() << SEP
+	  /************/
+	  << total.csvDump();
 
-	tRuntimeInfo total = buildGrid + pairGen + tripletPredict + tripletFilter;
-
-	s << Utils::csv({events, layers, layerTriplets, threads, hits, tracks}) << SEP; //header
-	s << read.csvDump() << SEP << write.csvDump() << SEP; //IO
-	s << buildGrid.csvDump() << SEP << pairGen.csvDump() << SEP << tripletPredict.csvDump() << SEP << tripletFilter.csvDump() << SEP << total.csvDump(); //runtime
 
 	return s.str();
 }
@@ -299,14 +373,27 @@ bool RuntimeRecordClass::operator==(const RuntimeRecord & r) const{
 
 std::string RuntimeRecordClass::csvDump() const {
 	std::stringstream s;
-
-	tRuntimeInfo totalMean = buildGridMean + pairGenMean + tripletPredictMean + tripletFilterMean;
-	tRuntimeInfo totalVar = buildGridVar + pairGenVar + tripletPredictVar + tripletFilterVar;
-
-	s << Utils::csv({events, layers, layerTriplets, threads, hits, tracks, (uint) records.size()}) << SEP; //header
-	s << readMean.csvDump(toVar(readVar)) << SEP << writeMean.csvDump(toVar(writeVar)) << SEP; //IO
-	s << buildGridMean.csvDump(toVar(buildGridVar)) << SEP << pairGenMean.csvDump(toVar(pairGenVar))
-	  << SEP << tripletPredictMean.csvDump(toVar(tripletPredictVar)) << SEP << tripletFilterMean.csvDump(toVar(tripletFilterVar)) << SEP << totalMean.csvDump(toVar(totalVar)); //runtime
+	/***********/
+	tRuntimeInfo totalMean = buildGridMean + pairGenMean + tripletPredictMean + tripletFilterMean
+							+ tripletConnectivityMean + trackletCircleFitterMean+ cellularAutomatonMean;
+	tRuntimeInfo totalVar = buildGridVar + pairGenVar + tripletPredictVar + tripletFilterVar
+							+ tripletConnectivityVar + trackletCircleFitterVar + cellularAutomatonVar;
+ 	/***********/
+ 	//header
+	s << Utils::csv({events, layers, layerTriplets, threads, hits, tracks, (uint) records.size()}) << SEP;
+	//IO
+	s << readMean.csvDump(toVar(readVar)) << SEP << writeMean.csvDump(toVar(writeVar)) << SEP;
+	//runtime
+	s << buildGridMean.csvDump(toVar(buildGridVar)) << SEP
+	  << pairGenMean.csvDump(toVar(pairGenVar)) << SEP
+	  << tripletPredictMean.csvDump(toVar(tripletPredictVar)) << SEP
+	  << tripletFilterMean.csvDump(toVar(tripletFilterVar)) << SEP
+	  /***********/
+	  << tripletConnectivityMean.csvDump(toVar(tripletConnectivityVar)) << SEP
+	  << trackletCircleFitterMean.csvDump(toVar(trackletCircleFitterVar)) << SEP
+	  << cellularAutomatonMean.csvDump(toVar(cellularAutomatonVar)) << SEP
+	  /***********/
+	  << totalMean.csvDump(toVar(totalVar));
 
 	return s.str();
 }
@@ -388,6 +475,11 @@ void RuntimeRecordClass::addRecord(const RuntimeRecord & r){
 		calculateMeanVar(pairGenMean, pairGenVar, r.pairGen, records.size());
 		calculateMeanVar(tripletPredictMean, tripletPredictVar, r.tripletPredict, records.size());
 		calculateMeanVar(tripletFilterMean, tripletFilterVar, r.tripletFilter, records.size());
+		/************/
+		calculateMeanVar(tripletConnectivityMean, tripletConnectivityVar, r.tripletConnectivity, records.size());
+		calculateMeanVar(trackletCircleFitterMean, trackletCircleFitterVar, r.trackletCircleFitter, records.size());
+		calculateMeanVar(cellularAutomatonMean, cellularAutomatonVar, r.cellularAutomaton, records.size());
+		/************/
 
 		calculateMeanVar(readMean, readVar, r.read, records.size());
 		calculateMeanVar(writeMean, writeVar, r.write, records.size());
@@ -450,13 +542,35 @@ std::string RuntimeRecords::csvDump() const {
 	std::stringstream s;
 
 	//header
-	s << Utils::csv({"events", "layers", "layerTriplets", "threads", "hits", "tracks", "n"}) << SEP; //header
-	s << Utils::csv({"readTime", "readTimeVar", "readBytes", "readBytesVar"}) << SEP; //read
-	s << Utils::csv({"writeTime", "writeTimeVar", "writeBytes", "writeBytesVar"}) << SEP; //write
+	s << Utils::csv({"events", "layers", "layerTriplets", "threads", "hits", "tracks", "n"}) << SEP;
+	//read
+	s << Utils::csv({"readTime", "readTimeVar", "readBytes", "readBytesVar"}) << SEP;
+	//write
+	s << Utils::csv({"writeTime", "writeTimeVar", "writeBytes", "writeBytesVar"}) << SEP; 
 	s << Utils::csv({"buildGridCount", "buildGridCountVar", "buildGridScan", "buildGridScanVar", "buildGridStore", "buildGridStoreVar", "buildGridWalltime", "buildGridWalltimeVar", "buildGridKernel", "buildGridKernelVar"}) << SEP; //buildGrid
 	s << Utils::csv({"pairGenCount", "pairGenCountVar", "pairGenScan", "pairGenScanVar", "pairGenStore", "pairGenStoreVar", "pairGenWalltime", "pairGenWalltimeVar", "pairGenKernel", "pairGenKernelVar"}) << SEP; //pairGen
 	s << Utils::csv({"tripletPredictCount", "tripletPredictCountVar", "tripletPredictScan", "tripletPredictScanVar", "tripletPredictStore", "tripletPredictStoreVar", "tripletPredictWalltime", "tripletPredictWalltimeVar", "tripletPredictKernel", "tripletPredictKernelVar"}) << SEP; //tripletPredict
 	s << Utils::csv({"tripletFilterCount", "tripletFilterCountVar", "tripletFilterScan", "tripletFilterScanVar", "tripletFilterStore", "tripletFilterStoreVar", "tripletFilterWalltime", "tripletFilterWalltimeVar", "tripletFilterKernel", "tripletFilterKernelVar"}) << SEP; //tripletFilter
+	/**********/
+	//tripletConnectivity
+	s << Utils::csv({"tripletFilterCount", "tripletFilterCountVar",
+					 "tripletFilterScan", "tripletFilterScanVar",
+					 "tripletFilterStore", "tripletFilterStoreVar",
+					 "tripletFilterWalltime", "tripletFilterWalltimeVar",
+					 "tripletFilterKernel", "tripletFilterKernelVar"}) << SEP;
+	//tracklet circle fitter
+	s << Utils::csv({"tripletFilterCount", "tripletFilterCountVar",
+					 "tripletFilterScan", "tripletFilterScanVar",
+					 "tripletFilterStore", "tripletFilterStoreVar",
+					 "tripletFilterWalltime", "tripletFilterWalltimeVar",
+					 "tripletFilterKernel", "tripletFilterKernelVar"}) << SEP;
+	// cellular automaton
+	s << Utils::csv({"tripletFilterCount", "tripletFilterCountVar",
+					 "tripletFilterScan", "tripletFilterScanVar",
+					 "tripletFilterStore", "tripletFilterStoreVar",
+					 "tripletFilterWalltime", "tripletFilterWalltimeVar",
+					 "tripletFilterKernel", "tripletFilterKernelVar"}) << SEP;
+	/*********/
 	s << Utils::csv({"totalCount", "totalCountVar", "totalScan", "totalScanVar", "totalStore", "totalStoreVar", "totalWalltime", "totalWalltimeVar", "totalKernel", "totalKernelVar"}); //totalTiming
 	s << std::endl;
 
