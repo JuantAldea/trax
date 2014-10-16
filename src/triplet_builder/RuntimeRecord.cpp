@@ -85,25 +85,21 @@ tIOInfo tIOInfo::operator+(const tIOInfo & rhs) const
 
 std::string tIOInfo::prettyPrint() const
 {
-
     std::stringstream s;
 
     s << bytes << " bytes in " << Utils::nsToMs(time) << " ms (" << bandwith() << " GB/s)";
 
     return s.str();
-
 }
 
 std::string tIOInfo::prettyPrint(const tIOInfo & var) const
 {
-
     std::stringstream s;
 
     s << bytes << " bytes in " << Utils::nsToMs(time) << " +/- " << Utils::nsToMs(
           var.time) << " ms (" << bandwith() << " GB/s)";
 
     return s.str();
-
 }
 
 std::string tIOInfo::csvDump() const
@@ -139,7 +135,6 @@ void fillInfo(tKernelEvent t, tRuntimeInfo & info)
 
 void RuntimeRecord::fillRuntimes(const clever::context & ctx)
 {
-
     //read
     tIOEvent read_ = ctx.getReadPerf();
 
@@ -198,7 +193,6 @@ void RuntimeRecord::fillRuntimes(const clever::context & ctx)
 
 void RuntimeRecord::logPrint() const
 {
-
     LOG << "Events: " << events << " Layers: " << layers << " LayerTriplets: " << layerTriplets
         << " Hits: " << hits << " Loaded tracks: " << tracks << std::endl;
 
@@ -279,7 +273,6 @@ void RuntimeRecord::logPrint() const
 
 void RuntimeRecordClass::logPrint() const
 {
-
     LOG << "Events: " << events << " Layers: " << layers << " LayerTriplets: " << layerTriplets
         << " Hits: " << hits << " Loaded tracks: " << tracks << std::endl;
     LOG << "Measurements: " << records.size() << std::endl;
@@ -498,7 +491,6 @@ tIOInfo RuntimeRecordClass::toVar(tIOInfo m2) const
 //n is INclusive new element
 void calculateMeanVar(tRuntimeInfo & mean, tRuntimeInfo & var, const tRuntimeInfo & x, uint n)
 {
-
     long double delta = x.count - mean.count;
     mean.count += delta / Utils::clamp(n);
     var.count +=  delta * (x.count - mean.count);
@@ -514,29 +506,22 @@ void calculateMeanVar(tRuntimeInfo & mean, tRuntimeInfo & var, const tRuntimeInf
     delta = x.walltime - mean.walltime;
     mean.walltime += delta / Utils::clamp(n);
     var.walltime +=  delta * (x.walltime - mean.walltime);
-
 }
 
 void calculateMeanVar(tIOInfo & mean, tIOInfo & var, const tIOInfo & x, uint n)
 {
-
     long double delta = x.time - mean.time;
     mean.time += delta / Utils::clamp(n);
     var.time += delta * (x.time - mean.time);
-
 
     //bytes should actually be pretty much the same
     delta = x.bytes - mean.bytes;
     mean.bytes += delta / Utils::clamp(n);
     var.bytes += delta * (x.bytes - mean.bytes);
-
 }
-
-
 
 void RuntimeRecordClass::addRecord(const RuntimeRecord & r)
 {
-
     if (*this == r) {
 
         records.push_back(r);
@@ -556,25 +541,20 @@ void RuntimeRecordClass::addRecord(const RuntimeRecord & r)
 
         calculateMeanVar(readMean, readVar, r.read, records.size());
         calculateMeanVar(writeMean, writeVar, r.write, records.size());
-
     }
-
 }
 
 void RuntimeRecordClass::merge(const RuntimeRecordClass & c)
 {
-
     //transfer all values
     for (uint i = 0; i < c.records.size(); ++i) {
         records.push_back(c.records[i]);
         addRecord(c.records[i]);
     }
-
 }
 
 void RuntimeRecords::addRecord(const RuntimeRecord & r)
 {
-
     for (uint i = 0; i < classes.size(); ++i) {
 
         if (classes[i] == r) {
@@ -589,7 +569,6 @@ void RuntimeRecords::addRecord(const RuntimeRecord & r)
     RuntimeRecordClass c(r);
     c.addRecord(r);
     classes.push_back(c);
-
 }
 
 void RuntimeRecords::addRecordClass(const RuntimeRecordClass & c)
@@ -612,7 +591,6 @@ void RuntimeRecords::merge(const RuntimeRecords & c)
     for (uint i = 0; i < c.classes.size(); ++i) {
         addRecordClass(c.classes[i]);
     }
-
 }
 
 std::string RuntimeRecords::csvDump() const

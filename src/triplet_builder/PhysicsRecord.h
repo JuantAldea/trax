@@ -102,7 +102,6 @@ struct tCircleParams {
 
 class PhysicsRecord
 {
-
 public:
     PhysicsRecord(uint e, uint lt) :
         event(e), layerTriplet(lt), efficiencyMean(0), efficiencyVar(0), fakeRateMean(0),
@@ -123,7 +122,6 @@ public:
     std::string csvDump(std::string outputDir = "") const;
 
 public:
-
     uint event;
 
     uint layerTriplet;
@@ -144,7 +142,6 @@ public:
         return layerTriplet == a.layerTriplet;
     }
 
-
 public:
     // Ideal Magnetic Field [T] (-0,-0, 3.8112)
     const double BZ = 3.8112;
@@ -156,7 +153,6 @@ public:
     const double GEV_C = 5.344286E-19;
 
 private:
-
     tCircleParams getCircleParams(const Hit & p1, const Hit & p2, const Hit & p3) const;
 
     double getTIP(const Hit & p1, const Hit & p2, const Hit & p3) const;
@@ -194,12 +190,10 @@ private:
     {
         return pt.binWidth * floor(pt_ / pt.binWidth);
     }
-
 };
 
 class PhysicsRecords
 {
-
 private:
     std::vector<PhysicsRecord> records;
 
@@ -208,5 +202,4 @@ public:
     void merge(const PhysicsRecords & c);
 
     std::string csvDump(std::string outputDir = "") const;
-
 };

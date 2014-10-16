@@ -119,12 +119,10 @@ public:
     //RuntimeRecord operator+(const RuntimeRecord& rhs) const;
 
     //void operator+=(const RuntimeRecord& rhs);
-
 };
 
 class RuntimeRecordClass
 {
-
 public:
     uint events;
     uint layers;
@@ -193,7 +191,6 @@ public:
 
 private:
     std::vector<RuntimeRecord> records;
-
 };
 
 class RuntimeRecords
@@ -209,7 +206,6 @@ public:
 
     void logPrint() const;
     std::string csvDump() const;
-
 };
 
 

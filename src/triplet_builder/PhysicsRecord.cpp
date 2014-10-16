@@ -33,19 +33,16 @@ void tBinnedData::operator+=(const tBinnedData c)
 
 void tBinnedData::fill()
 {
-
     efficiencyMean = ((double) valid) / Utils::clamp(valid + missed);
     fakeRateMean = ((double) fake / Utils::clamp(valid + fake + clones + misc));
     cloneRateMean = ((double) clones / Utils::clamp(valid + fake + clones + misc));
 
     n = valid + fake + clones + misc;
-
 }
 
 tCircleParams PhysicsRecord::getCircleParams(const Hit & p1, const Hit & p2,
         const Hit & p3) const
 {
-
     tCircleParams params;
 
     //circle fit
@@ -89,7 +86,6 @@ tCircleParams PhysicsRecord::getCircleParams(const Hit & p1, const Hit & p2,
 void PhysicsRecord::fillData(const TrackletCollection& tracklets,
                              const HitCollection::tTrackList& mcTruth, const HitCollection& hits, uint nLayerTriplets)
 {
-
     LOG << "Evaluating event " << event << " layer triplet " << layerTriplet  << std::endl;
 
     //std::ofstream histo("ptCalc", std::ios::app);
@@ -186,7 +182,6 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
             VLOG << " TIP: " << getTIP(Hit(hits, tracklet.hit1()), Hit(hits, tracklet.hit2()), Hit(hits,
                                        tracklet.hit3()));
             VLOG << zkr::cc::console << std::endl;
-
         }
     }
 
@@ -230,9 +225,7 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
 
     LOG << "Efficiency: " << efficiencyMean  << " FakeRate: " << fakeRateMean << " CloneRate: " <<
         cloneRateMean << std::endl;
-
     //histo.close();
-
 }
 
 void mergeHistograms(tHistogram & t1, const tHistogram & t2)
@@ -250,7 +243,6 @@ void mergeHistograms(tHistogram & t1, const tHistogram & t2)
 
 void PhysicsRecord::merge(const PhysicsRecord& c)
 {
-
     mergeHistograms(eta, c.eta);
     mergeHistograms(pt, c.pt);
 
@@ -267,12 +259,10 @@ void PhysicsRecord::merge(const PhysicsRecord& c)
     delta = c.cloneRateMean - cloneRateMean;
     cloneRateMean += c.n * delta / Utils::clamp(n);
     cloneRateVar +=  c.n * delta * (c.cloneRateMean - cloneRateMean) + c.cloneRateVar;
-
 }
 
 std::string PhysicsRecord::csvDump(std::string outputDir) const
 {
-
     std::stringstream s;
 
     s << Utils::csv({layerTriplet, n}) << SEP; //header
@@ -304,7 +294,6 @@ std::string PhysicsRecord::csvDump(std::string outputDir) const
 
 double PhysicsRecord::getTIP(const Hit & p1, const Hit & p2, const Hit & p3) const
 {
-
     tCircleParams params = getCircleParams(p1, p2, p3);
 
     //find point of closest approach to (0,0) = cOrigin + cR * unitVec(toOrigin)
@@ -324,7 +313,6 @@ double PhysicsRecord::getTIP(const Hit & p1, const Hit & p2, const Hit & p3) con
 
 void PhysicsRecords::addRecord(const PhysicsRecord& r)
 {
-
     for (uint i = 0; i < records.size(); ++i) {
 
         if (records[i] == r) {
@@ -334,7 +322,6 @@ void PhysicsRecords::addRecord(const PhysicsRecord& r)
     }
 
     records.push_back(r);
-
 }
 
 void PhysicsRecords::merge(const PhysicsRecords& c)
@@ -346,7 +333,6 @@ void PhysicsRecords::merge(const PhysicsRecords& c)
 
 std::string PhysicsRecords::csvDump(std::string outputDir) const
 {
-
     std::stringstream s;
 
     //header
@@ -369,7 +355,6 @@ std::string PhysicsRecords::csvDump(std::string outputDir) const
     s << total.csvDump(outputDir) << std::endl;
 
     return s.str();
-
 }
 
 std::string tBinnedData::csvDump() const
@@ -383,7 +368,6 @@ std::string tBinnedData::csvDump() const
 
 std::string tHistogram::csvDump() const
 {
-
     std::stringstream s;
 
     s << Utils::csv({"bin", "valid", "fake", "clones", "missed", "misc", "efficiencyMean", "efficiencyVar", "fakeRateMean", "fakeRateVar", "cloneRateMean", "cloneRateVar"})
@@ -394,5 +378,4 @@ std::string tHistogram::csvDump() const
     }
 
     return s.str();
-
 }
