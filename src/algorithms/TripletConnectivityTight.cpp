@@ -10,7 +10,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
     uint nTracklets = trackletsInitial.size();
     uint nOracleCount = nTracklets;
     //uint nOracleCount = std::ceil(nTracklets / (float) sizeof(uint));
-    uint nGroups = (uint) std::max(1.0f, ceil(((float) nTracklets) / nThreads));
+    uint nGroups = uint(std::max(1.0f, ceil(float(nTracklets) / nThreads)));
 
     PLOG << "Initial tracklets: " << nTracklets << std::endl;
     cl_event evt;

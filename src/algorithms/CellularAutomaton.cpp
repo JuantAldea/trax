@@ -26,8 +26,8 @@ void CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
 
     const uint nTripletPairs = tripletsBasis.get_count();
     const uint nTriplets = tripletsPt.get_count();
-    const uint nGroupsForTriplets = (uint) std::max(1.0f, ceil(((float) nTriplets) / nThreads));
-    const uint nGroupsForPairs = (uint) std::max(1.0f, ceil(((float) nTripletPairs) / nThreads));
+    const uint nGroupsForTriplets = uint(std::max(1.0f, ceil(float(nTriplets) / nThreads)));
+    const uint nGroupsForPairs = uint(std::max(1.0f, ceil(float(nTripletPairs) / nThreads)));
 
     LOG << std::endl << "Runing CA, forward phase:" << std::endl;
     clever::vector<uint, 1> * tripletsStates = new clever::vector<uint, 1>(1, nTriplets, ctx);

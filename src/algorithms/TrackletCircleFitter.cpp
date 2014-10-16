@@ -10,7 +10,7 @@ TrackletCircleFitter::run(const HitCollection &hits,
     LOG << std::endl << "BEGIN TrackletCircleFitter" << std::endl;
     
     const uint nTracklets = tracklets.size();
-    const uint nGroups = (uint) std::max(1.0f, ceil(((float) nTracklets) / nThreads));
+    const uint nGroups = uint(std::max(1.0f, ceil(float(nTracklets) / nThreads)));
     //const uint nGroups = (uint) std::max(1.0f, ceil(((float) nTracklets) / 1));
     clever::vector<float, 1> * const tripletPt  = new clever::vector<float, 1>(nTracklets, ctx);
 

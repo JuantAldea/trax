@@ -247,9 +247,9 @@ public:
 
     KERNEL_CLASS(predicateInversionInPlaceStore,
                  __kernel void predicateInversionInPlaceStore(
-                     //input
+                     //I/O
                      __global uint * const predicate,
-                     //output
+                     //workload
                      const uint nValues)
     {
         const size_t gid = get_global_id(0);
@@ -269,6 +269,7 @@ public:
                      __global const uint * const __restrict predicate,
                      //output
                      __global uint * const __restrict invPredicate,
+                     //workload
                      const uint nValues)
     {
         const size_t gid = get_global_id(0);
