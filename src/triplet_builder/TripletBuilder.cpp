@@ -248,7 +248,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             //transer hits to gpu
             hits.transfer.initBuffers(*contx, hits);
             hits.transfer.toDevice(*contx, hits);
-                        
+
             //transferring layer supplement
             eventSupplement->transfer.initBuffers(*contx, *eventSupplement);
             eventSupplement->transfer.toDevice(*contx, *eventSupplement);
@@ -285,36 +285,38 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 
             runtime.tripletFilter.startWalltime();
             TrackletCollection * tracklets = tripletThetaPhi.run(hits, grid, *pairs, *tripletCandidates,
-                                             exec.threads, layerConfig);
+                                             exec.threads, layerConfig, true);
             runtime.tripletFilter.stopWalltime();
-            
+
             /*******************************************/
 
 
-            // On average a dEta = 0.0256 cut reduces the amount of triplets pairs by a 33.7% (stdev 19.6)            
+            // On average a dEta = 0.0256 cut reduces the amount of triplets pairs by a 33.7% (stdev 19.6)
             TripletConnectivityTight tripletConnectivityTight(*contx);
             float dEtaCut  = 0.0256;
             runtime.tripletConnectivity.startWalltime();
-            auto connectableTrackletsPairIndices = tripletConnectivityTight.run(hits, *tracklets, dEtaCut, exec.threads, false);
+            auto connectableTrackletsPairIndices = tripletConnectivityTight.run(hits, *tracklets, dEtaCut,
+                                                   exec.threads, false);
             runtime.tripletConnectivity.stopWalltime();
-            
+
             //tripletConnectivityTight.run(hits, *tracklets, dEtaCut, exec.threads, true);
             //std::cerr << tracklets->size() << std::endl;
-            
+
             // TODO filter the stream here, we dont want gaps neither for the fitting nor for the CA.
             runtime.trackletCircleFitter.startWalltime();
             TrackletCircleFitter trackletCircleFitter(*contx);
-            auto tripletPt = trackletCircleFitter.run(hits, *tracklets, *std::get<2>(connectableTrackletsPairIndices), exec.threads, false);
+            auto tripletPt = trackletCircleFitter.run(hits, *tracklets,
+                             *std::get<2>(connectableTrackletsPairIndices), exec.threads, false);
             runtime.trackletCircleFitter.stopWalltime();
-            
+
             runtime.cellularAutomaton.startWalltime();
-            
+
             CellularAutomaton cellularAutomaton(*contx);
             cellularAutomaton.run(*std::get<0>(connectableTrackletsPairIndices),
                                   *std::get<1>(connectableTrackletsPairIndices),
                                   *tripletPt,
                                   *std::get<2>(connectableTrackletsPairIndices),
-                                  exec.threads, false);
+                                  exec.threads, true);
 
             runtime.cellularAutomaton.stopWalltime();
 
@@ -599,11 +601,11 @@ int main(int argc, char *argv[])
                       << getFilename(exec.configFile) << (testSuiteFile != "" ? "." : "")
                       << getFilename(testSuiteFile) << (exec.useCPU ? ".cpu" : ".gpu")
                       << ".csv";
-    
+
     std::stringstream outputDirRuntime;
     outputDirRuntime << g_traxDir << "/runtime/" << getFilename(exec.configFile);
     boost::filesystem::create_directories(outputDirRuntime.str());
-    
+
     std::ofstream runtimeRecordsFile(outputFileRuntime.str(), std::ios::trunc);
     runtimeRecordsFile << runtimeRecords.csvDump();
     runtimeRecordsFile.close();
