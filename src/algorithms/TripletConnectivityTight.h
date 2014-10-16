@@ -40,12 +40,13 @@ public:
     }
 
     std::tuple<clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>*>
-    run(const HitCollection &hits, TrackletCollection &tracklets, const float dEtaCut, const uint nThreads, bool printPROLIX = false) const;
-    
+    run(const HitCollection &hits, TrackletCollection &tracklets, const float dEtaCut,
+        const uint nThreads, bool printPROLIX = false) const;
+
 
     KERNEL_CLASS(tripletEtaCalculatorStore,
                  __kernel void tripletEtaCalculatorStore(
-                    //input
+                     //input
                      __global const float * const __restrict hitX,
                      __global const float * const __restrict hitY,
                      __global const float * const __restrict hitZ,
@@ -61,16 +62,16 @@ public:
         if (tripletIndex >= nTracklets) {
             return;
         }
-        
+
         const uint hitInnerIndex = tripletInnerHitId[tripletIndex];
         const uint hitOuterIndex = tripletOuterHitId[tripletIndex];
 
         float3 hitInner = (float3)(hitX[hitInnerIndex], hitY[hitInnerIndex], hitZ[hitInnerIndex]);
         float3 hitOuter = (float3)(hitX[hitOuterIndex], hitY[hitOuterIndex], hitZ[hitOuterIndex]);
         float3 p = (float3)(hitOuter - hitInner);
-        
+
         const float t = p.z / sqrt(p.x * p.x + p.y * p.y);
-        
+
         tripletEta[tripletIndex] = asinh(t);
     },
     cl_mem, cl_mem, cl_mem, cl_mem, cl_mem,
@@ -109,13 +110,13 @@ public:
         uint connectivityCountLocal = 0;
         for (uint i = 0; i < nTracklets; i++) {
             const bool test = (hitIndexInner == hitsFollowersH0[i])
-                            * (hitIndexOuter == hitsFollowersH1[i])
-                            * (fabs(localTripletEta - tripletsEta[i]) < dEtaCut);
-            
+                              * (hitIndexOuter == hitsFollowersH1[i])
+                              * (fabs(localTripletEta - tripletsEta[i]) < dEtaCut);
+
             connectivityCountLocal += test;
 
             //protecting this atomic_or with the if reduces the kernel time form 60ms to 16
-            if(test){
+            if (test) {
                 //atomic_or(&connectivityOracle[i / sizeof(uint)], test << (i % sizeof(uint)));
                 //atomic_or(&connectivityOracle[i], test);
                 //given that this will always set to 1, is the atomic really needed?
@@ -125,9 +126,9 @@ public:
         }
 
         connectivityCount[tripletIndex] = connectivityCountLocal;
-        
+
         //atomic_or(&connectivityOracle[tripletIndex / sizeof(uint)], (connectivityCountLocal > 0) << (tripletIndex % sizeof(uint)));
-        if(connectivityCountLocal){
+        if (connectivityCountLocal) {
             //atomic_or(&connectivityOracle[tripletIndex], connectivityCountLocal > 0);
             atomic_or(&connectivityOracle[tripletIndex], 1);
             //connectivityOracle[tripletIndex] = 1;
@@ -139,7 +140,7 @@ public:
 
     KERNEL_CLASS(tripletConnectivityTightStore,
                  __kernel void tripletConnectivityTightStore(
-                    //input
+                     //input
                      __global const uint * const __restrict hitsBasisH1,
                      __global const uint * const __restrict hitsBasisH2,
                      __global const uint * const __restrict hitsFollowersH0,
@@ -165,10 +166,10 @@ public:
 
         uint storeOffset = connectivityPrefixSum[tripletIndex];
         const uint storeOffsetNextTriplet = connectivityPrefixSum[tripletIndex + 1];
-        
+
         //connectivityOracle not needed, vality given by storeOffsets difference
         for (uint i = 0; (i < nTracklets) * (storeOffset < storeOffsetNextTriplet); i++) {
-            const bool test = (hitIndexInner == hitsFollowersH0[i]) 
+            const bool test = (hitIndexInner == hitsFollowersH0[i])
                               * (hitIndexOuter == hitsFollowersH1[i])
                               * (fabs(localTripletEta - tripletsEta[i]) < dEtaCut);
             // the same position will be overwritten until it is valid
@@ -181,7 +182,7 @@ public:
     cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_float, cl_mem,
     cl_mem, cl_mem,
     cl_uint);
-    
+
 
     //This filtering uses the prefix sums, its not the quickest way
     //of filtering by predicate but it is stable ie, it preserves
@@ -190,21 +191,21 @@ public:
     // atomics.
     KERNEL_CLASS(streamCompactionGetValidIndexesStore,
                  __kernel void streamCompactionGetValidIndexesStore(
-                    //input
-                    __global const uint * const __restrict predicatePrefixSum,
-                    //output
-                    __global uint * const __restrict validIndexes,
-                    //work load
-                    const uint streamLength)
+                     //input
+                     __global const uint * const __restrict predicatePrefixSum,
+                     //output
+                     __global uint * const __restrict validIndexes,
+                     //work load
+                     const uint streamLength)
     {
         const size_t gid = get_global_id(0);
 
-        if(gid >= streamLength) {
+        if (gid >= streamLength) {
             return;
         }
-        
+
         const uint localPredicatePrefixSum = predicatePrefixSum[gid];
-        if(localPredicatePrefixSum != predicatePrefixSum[gid + 1]){
+        if (localPredicatePrefixSum != predicatePrefixSum[gid + 1]) {
             validIndexes[localPredicatePrefixSum] = gid;
         }
     },
@@ -213,25 +214,25 @@ public:
     cl_uint);
 
     KERNEL_CLASS(streamCompactionFilter3StreamsStore,
-                __kernel void streamCompactionFilter3StreamsStore(
-                    //input
-                    __global const uint * const __restrict stream1,
-                    __global const uint * const __restrict stream2,
-                    __global const uint * const __restrict stream3,
-                    __global const uint * const __restrict indexes,
-                    //output
-                    __global uint * const __restrict filteredStream1,
-                    __global uint * const __restrict filteredStream2,
-                    __global uint * const __restrict filteredStream3,
-                    //work load
-                    const uint nIndexes)
+                 __kernel void streamCompactionFilter3StreamsStore(
+                     //input
+                     __global const uint * const __restrict stream1,
+                     __global const uint * const __restrict stream2,
+                     __global const uint * const __restrict stream3,
+                     __global const uint * const __restrict indexes,
+                     //output
+                     __global uint * const __restrict filteredStream1,
+                     __global uint * const __restrict filteredStream2,
+                     __global uint * const __restrict filteredStream3,
+                     //work load
+                     const uint nIndexes)
     {
         const size_t gid = get_global_id(0);
 
         if (gid >= nIndexes) {
             return;
         }
-        
+
         //TODO this is an stupid and naive way of doing this
         //probably it's even better to call the kernel three
         //times as it will trash the caches less.
@@ -240,42 +241,42 @@ public:
         filteredStream2[gid] = stream2[indexes[gid]];
         filteredStream3[gid] = stream3[indexes[gid]];
     },
-    cl_mem, cl_mem, cl_mem, cl_mem, 
+    cl_mem, cl_mem, cl_mem, cl_mem,
     cl_mem, cl_mem, cl_mem,
     cl_uint);
 
     KERNEL_CLASS(predicateInversionInPlaceStore,
-                __kernel void predicateInversionInPlaceStore(
-                    //input
-                    __global uint * const predicate,
-                    //output
-                    const uint nValues)
+                 __kernel void predicateInversionInPlaceStore(
+                     //input
+                     __global uint * const predicate,
+                     //output
+                     const uint nValues)
     {
         const size_t gid = get_global_id(0);
 
         if (gid >= nValues) {
             return;
         }
-        
+
         predicate[gid] = !predicate[gid];
     },
     cl_mem,
     cl_uint);
 
     KERNEL_CLASS(predicateInversionStore,
-                __kernel void predicateInversionStore(
-                    //input
-                    __global const uint * const __restrict predicate,
-                    //output
-                    __global uint * const __restrict invPredicate,
-                    const uint nValues)
+                 __kernel void predicateInversionStore(
+                     //input
+                     __global const uint * const __restrict predicate,
+                     //output
+                     __global uint * const __restrict invPredicate,
+                     const uint nValues)
     {
         const size_t gid = get_global_id(0);
 
         if (gid >= nValues) {
             return;
         }
-        
+
         invPredicate[gid] = !predicate[gid];
     },
     cl_mem,
