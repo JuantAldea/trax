@@ -114,6 +114,19 @@ Pairing * TripletThetaPhiPredictor::run(HitCollection & hits, const DetectorGeom
 
     TripletThetaPhiPredictor::events.push_back(evt);
     LOG << "done" << std::endl;
+    
+    if ((PROLIX) && printPROLIX) {
+
+        PLOG << "[TripletThetaPhiPredictor] Fetching candidates offsets before monotonize...";
+        std::vector<uint> candOffsets = m_triplets->getPairingOffsets();
+        PLOG << "done[" << candOffsets.size() << "]" << std::endl;
+
+        PLOG << "Candidate offsets:" << std::endl;
+        for (uint i = 0; i < candOffsets.size(); ++i) {
+            PLOG << "[" << i << "] "  << candOffsets[i] << " ";
+        }
+        PLOG << std::endl;
+    }
 
     LOG << "Running filter offset monotonize kernel...";
     nGroups = (uint) std::max(1.0f,
@@ -126,26 +139,31 @@ Pairing * TripletThetaPhiPredictor::run(HitCollection & hits, const DetectorGeom
     LOG << "done" << std::endl;
 
     if ((PROLIX) && printPROLIX) {
+        PLOG << "[TripletThetaPhiPredictor] Fetching candidates offsets after monotonize...";
+        std::vector<uint> candOffsets = m_triplets->getPairingOffsets();
+        PLOG << "done[" << candOffsets.size() << "]" << std::endl;
+
+        PLOG << "Candidate offsets:" << std::endl;
+        for (uint i = 0; i < candOffsets.size(); ++i) {
+            PLOG << "[" << i << "] "  << candOffsets[i] << " ";
+        }
+        PLOG << std::endl;
+    }
+/*
+    if ((PROLIX) && printPROLIX) {
         PLOG << "Fetching triplet candidates...";
         std::vector<uint2> cands = m_triplets->getPairings();
         PLOG << "done[" << cands.size() << "]" << std::endl;
 
+        std::vector<uint2> pairsFromPairGenerator = pairs.getPairings();
         PLOG << "Candidates:" << std::endl;
         for (uint i = 0; i < nFoundTripletCandidates; ++i) {
-            PLOG << "[" << i << "] "  << cands[i].x << "-" << cands[i].y << std::endl;
-        }
-
-        PLOG << "Fetching candidates offets...";
-        std::vector<uint> candOffsets = m_triplets->getPairingOffsets();
-        PLOG << "done[" << candOffsets.size() << "]" << std::endl;
-
-        PLOG << "Candidate Offsets:" << std::endl;
-        for (uint i = 0; i < candOffsets.size(); ++i) {
-            PLOG << "[" << i << "] "  << candOffsets[i] << std::endl;
+            PLOG << "[" << i << "] "  << cands[i].x << "-" << cands[i].y
+                 << " ==> [" << pairsFromPairGenerator[cands[i].x].x << "-" << pairsFromPairGenerator[cands[i].x].y << "-" << cands[i].y << "]"<< std::endl;
         }
     }
-
-    PLOG << "END TripletThetaPhiPredictor" << std::endl;
+*/
+    PLOG << "END TripletThetaPhiPredictor" << std::endl << std::endl;
 
     return m_triplets;
 }
