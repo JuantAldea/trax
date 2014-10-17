@@ -267,6 +267,20 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             gridBuilder.run(hits, exec.threads, *eventSupplement, *layerSupplement, grid);
             runtime.buildGrid.stopWalltime();
 
+            /****************************/
+            // print updated hit information
+            PLOG << "UPDATED HIT IDS" << std::endl;
+            for (uint i = 0; i < hits.size(); i++){
+                PLOG << "[" << i << "]"
+                    << "ID: " << hits.getValue(HitId(), i)
+                    << " Layer: " << hits.getValue(DetectorLayer(), i)
+                     << " ["  << hits.getValue(GlobalX(), i)
+                     << ", " << hits.getValue(GlobalY(), i)
+                     << ", " << hits.getValue(GlobalZ(), i)
+                     << "]" << std::endl;
+            }
+            /****************************/
+
             //run it
             PairGeneratorBeamspot pairGen(*contx);
 
@@ -278,7 +292,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 
             runtime.tripletPredict.startWalltime();
             Pairing * tripletCandidates = predictor.run(hits, geom, geomSupplement, dict, exec.threads,
-                                          layerConfig, grid, *pairs);
+                                          layerConfig, grid, *pairs, true);
             runtime.tripletPredict.stopWalltime();
 
             TripletThetaPhiFilter tripletThetaPhi(*contx);
@@ -312,7 +326,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             runtime.cellularAutomaton.startWalltime();
 
             CellularAutomaton cellularAutomaton(*contx);
-            cellularAutomaton.run(*std::get<0>(connectableTrackletsPairIndices),
+            auto caOutput = cellularAutomaton.run(*std::get<0>(connectableTrackletsPairIndices),
                                   *std::get<1>(connectableTrackletsPairIndices),
                                   *tripletPt,
                                   *std::get<2>(connectableTrackletsPairIndices),
@@ -320,12 +334,50 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 
             runtime.cellularAutomaton.stopWalltime();
 
+
+            std::vector<uint> vTrackCollection(std::get<0>(caOutput)->get_count());
+            transfer::download(*std::get<0>(caOutput), vTrackCollection, *contx);
+            
+            std::vector<uint> vPSum(std::get<1>(caOutput)->get_count());
+            transfer::download(*std::get<1>(caOutput), vPSum, *contx);
+            int iTrack = 0;
+            PLOG << "OUTSIDE" << std::endl;
+            for (uint i = 0; i < vPSum.size() - 1; i++) {
+
+                uint trackOffset = vPSum[i];
+                uint trackLength = vPSum[i + 1] - trackOffset;
+                
+            
+                if (trackLength < 0) {
+                    continue;
+                }
+               
+                 //the triplet is a handler.
+                PLOG << "Track #" << iTrack
+                     << " with triplet length " << trackLength
+                     << " begins at " << trackOffset
+                     << std::endl;
+                PLOG << "\tTriplets #: ";
+                
+                
+                for (uint j = 0; j < trackLength; j++) {
+                    PLOG << "[" << tracklets->getValue(TrackletHit1(), vTrackCollection[trackOffset + (trackLength - 1 -j)])
+                         << "-"<< tracklets->getValue(TrackletHit2(), vTrackCollection[trackOffset + (trackLength - 1 -j)])
+                         << "-"<< tracklets->getValue(TrackletHit3(), vTrackCollection[trackOffset + (trackLength - 1 -j)])
+                         << "]";
+                }
+             
+                iTrack++;
+                PLOG << std::endl << std::endl;
+            }
+            /*******************************************/
+            
             delete std::get<0>(connectableTrackletsPairIndices);
             delete std::get<1>(connectableTrackletsPairIndices);
             delete std::get<2>(connectableTrackletsPairIndices);
             delete std::get<3>(connectableTrackletsPairIndices);
-
-            /*******************************************/
+            delete std::get<0>(caOutput);
+            delete std::get<1>(caOutput);
 
             LOG << std::endl;
 
@@ -338,7 +390,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 
             //physics
             for (uint e = 0; e < grid.config.nEvents; ++e) {
-                for (uint p = 0; p < layerConfig.size(); ++ p) {
+                for (uint p = 0; p < layerConfig.size(); ++p) {
                     PhysicsRecord physics(e, p);
                     physics.fillData(*tracklets, validTracks[e], hits, layerConfig.size());
                     physicsRecords.addRecord(physics);
