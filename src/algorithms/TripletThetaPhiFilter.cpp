@@ -122,7 +122,7 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
 
     LOG << "Running filter offset store kernel...";
     nGroups = (uint) std::max(1.0f, ceil(((float) nFoundTriplets) / nThreads));
-    LOG << "LAYER TRIPLETS " << layerTriplets.size() << std::endl;
+    PLOG << "LAYER SIZE " << layerTriplets.size() << " " << tracklets->trackletOffsets.get_count() << std::endl;
     evt = filterOffsetStore.run(
               //tracklets
               tracklets->transfer.buffer(TrackletHit1()),
@@ -134,7 +134,19 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
               range(nThreads));
     TripletThetaPhiFilter::events.push_back(evt);
     LOG << "done" << std::endl;
-    std::vector<uint> tripOffsetsNonMonotonized = tracklets->getTrackletOffsets();
+
+    if ((PROLIX) && printPROLIX) {
+
+        PLOG << "[TripletThetaPhiFilter] Fetching triplet offsets before monotonize...";
+        std::vector<uint> tripOffsetsNonMonotonized = tracklets->getTrackletOffsets();
+        PLOG << "done[" << tripOffsetsNonMonotonized.size() << "]" << std::endl;
+
+        for (uint i = 0; i < tripOffsetsNonMonotonized.size(); ++i) {
+            PLOG << "[" << i << "] "  << tripOffsetsNonMonotonized[i] << " ";
+        }
+        PLOG << std::endl;
+      }
+
     LOG << "Running filter offset monotonize kernel...";
     nGroups = (uint) std::max(1.0f,
                               ceil(((float) tracklets->trackletOffsets.get_count()) / nThreads));
@@ -144,6 +156,26 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
               range(nThreads));
     TripletThetaPhiFilter::events.push_back(evt);
     LOG << "done" << std::endl;
+  
+    if ((PROLIX) && printPROLIX) {
+        PLOG << "[TripletThetaPhiFilter] Fetching triplet offets after monotonize...";
+        std::vector<uint> tripOffsets = tracklets->getTrackletOffsets();
+        PLOG << "done[" << tripOffsets.size() << "]" << std::endl;
+
+        PLOG << "Tracklet Offsets:" << std::endl;
+        for (uint i = 0; i < tripOffsets.size(); ++i) {
+            PLOG << "[" << i << "] "  << tripOffsets[i] << " ";
+        }
+        PLOG << std::endl;
+
+        PLOG << "WHAT ARE THESE Offsets:" << std::endl;
+        for (uint i = 0; i < tripOffsets.size(); ++i) {
+            Tracklet tracklet(*tracklets, tripOffsets[i]);
+            PLOG << "[" << i << "]" << "[" << tracklet.hit1() << "-" << tracklet.hit2() << "-"
+                 << tracklet.hit3() << "]" << std::endl;
+        }
+    }
+
     LOG << "Fetching triplets...";
     tracklets->transfer.fromDevice(ctx, *tracklets);
     LOG << "done[" << tracklets->size() << "]" << std::endl;
@@ -152,38 +184,17 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
         PLOG << "Tracklets: " << std::endl;
         for (uint i = 0; i < nFoundTriplets; ++i) {
             Tracklet tracklet(*tracklets, i);
-            PLOG << "[" << i << "]" << "[" << tracklet.hit1() << "-" << tracklet.hit2() << "-" <<
-                 tracklet.hit3() << "]" << std::endl;;
+            PLOG << "[" << i << "]"
+                 << "[" << tracklet.hit1()
+                 << "-" << tracklet.hit2()
+                 << "-" << tracklet.hit3()
+                 << "]"
+                 << "[" << hits.getValue(GlobalX(), tracklet.hit1())
+                 << ", " << hits.getValue(GlobalX(), tracklet.hit2())
+                 << ", " << hits.getValue(GlobalX(), tracklet.hit3())
+                 << "]"
+                 << std::endl;;
         }
-    }
-
-    if ((PROLIX) && printPROLIX) {
-        LOG << "OFFSETS BEFORE MONOTONIZE" << std::endl;
-        LOG << "done[" << tripOffsetsNonMonotonized.size() << "]" << std::endl;
-
-        for (uint i = 0; i < tripOffsetsNonMonotonized.size(); ++i) {
-            LOG << "[" << i << "] "  << tripOffsetsNonMonotonized[i] << std::endl;
-        }
-        PLOG << "Fetching triplet offets...";
-        std::vector<uint> tripOffsets = tracklets->getTrackletOffsets();
-        PLOG << "done[" << tripOffsets.size() << "]" << std::endl;
-
-        PLOG << "Tracklet Offsets:" << std::endl;
-        for (uint i = 0; i < tripOffsets.size(); ++i) {
-            PLOG << "[" << i << "] "  << tripOffsets[i] << std::endl;
-        }
-
-        if (tripOffsetsNonMonotonized != tripOffsets) {
-            LOG << "DIFF" << std::endl;
-        }
-        
-        PLOG << "WHAT ARE THESE Offsets:" << std::endl;
-        for (uint i = 0; i < tripOffsets.size(); ++i) {
-            Tracklet tracklet(*tracklets, i);
-            PLOG << "[" << tripOffsets[i] << "]" << "[" << tracklet.hit1() << "-" << tracklet.hit2() << "-"
-                 << tracklet.hit3() << "]" << std::endl;;
-        }
-
     }
 
     LOG << "END TripletThetaPhiFilter" << std::endl;
