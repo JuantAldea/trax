@@ -240,29 +240,18 @@ public:
         uint layerTriplet = hitLayer[hitId];
         uint event = hitEvent[hitId];
 
-        printf("GID %lu EVENT %u hitID %u layer %u ", gid, event, hitId, layerTriplet);
         if (gid > 0) {
             uint previousHitId = trackletHitId1[gid - 1];
-            printf("=> PREVIOUS: EVENT %u hitID %u layer %u", hitEvent[previousHitId], previousHitId, hitLayer[previousHitId]);
             //this thread is the last one processing an element of this particular event or layer triplet
             if (layerTriplet != hitLayer[previousHitId] || event != hitEvent[previousHitId]) {
-                printf(" => STORING: CHANGED");
-                if(layerTriplet != hitLayer[previousHitId] && event != hitEvent[previousHitId]) printf(" BOTH ");
-                if(layerTriplet != hitLayer[previousHitId]) printf(" LAYER ");
-                if(event != hitEvent[previousHitId]) printf(" EVENT ");
-                printf(" => trackletOffsets[%u * %u + %u - 1 = %u ] = %lu", event, nLayerTriplets, layerTriplet, event * nLayerTriplets + layerTriplet - 1, gid);
                 trackletOffsets[event * nLayerTriplets + layerTriplet - 1] = gid;
             }
             // if this triplet is the last one, the offset has to be stored in the next (and usually the last position) of the offset buffer.
             if ((gid + 1) == nTracklets){
-              printf(" => STORING: LAST ONE");
-              printf(" => trackletOffsets[%u * %u + %u - 0 = %u ] = %lu", event, nLayerTriplets, layerTriplet, event * nLayerTriplets + layerTriplet, gid);
               // since layerTriplet starts by 1, for this particular case, we have the right position without substracting 1 to the layerTriplet.
               trackletOffsets[event * nLayerTriplets + layerTriplet] = gid;
             }
         } else {
-            printf(" => STORING: NO PREVIOUS");
-            printf(" => trackletOffsets[%u * %u + %u - 1 = %u ] = %lu", event, nLayerTriplets, layerTriplet, event * nLayerTriplets + layerTriplet - 1, gid);
             trackletOffsets[event * nLayerTriplets + layerTriplet - 1] = gid;
         }
         printf("\n");
