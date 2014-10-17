@@ -254,7 +254,6 @@ public:
         } else {
             trackletOffsets[event * nLayerTriplets + layerTriplet - 1] = gid;
         }
-        printf("\n");
     },
     cl_mem,
     cl_uint, cl_uint,
