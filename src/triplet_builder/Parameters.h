@@ -8,6 +8,7 @@ public:
 	uint threads;
 	uint eventGrouping;
 	bool useCPU;
+	std::string computingPlatform;
 	uint iterations;
 	int verbosity;
 	std::string layerTripletConfigFile;

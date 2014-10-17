@@ -65,34 +65,52 @@ clever::context * createContext(ExecutionParameters exec)
 #define DEBUG_OCL 0
 #endif
 
-    clever::context *contx;
+    clever::context_settings settings;
     if (!exec.useCPU) {
         try {
             //try gpu
-            clever::context_settings settings = clever::context_settings::default_gpu();
+            if (exec.computingPlatform == "amd"){
+                settings = clever::context_settings::amd_gpu();
+            }else if (exec.computingPlatform == "nvidia"){
+                settings = clever::context_settings::nvidia_gpu();
+            }else{
+                settings = clever::context_settings::default_gpu();
+            }
+
             settings.m_profile = true;
 
-            contx = new clever::context(settings);
             LLOG << "success" << std::endl;
         } catch (const std::runtime_error & e) {
             //if not use cpu
-            clever::context_settings settings = clever::context_settings::default_cpu();
+            if (exec.computingPlatform == "amd"){
+                settings = clever::context_settings::amd_cpu();
+            }else if (exec.computingPlatform == "intel"){
+                settings = clever::context_settings::intel_cpu();
+            }else{
+                settings = clever::context_settings::default_cpu();
+            }
+
             settings.m_profile = true;
             settings.m_cmd_queue_properties |= DEBUG_OCL;
 
-            contx = new clever::context(settings);
             LLOG << "error: fallback on CPU" << std::endl;
         }
     } else {
-        clever::context_settings settings = clever::context_settings::default_cpu();
+        if (exec.computingPlatform == "amd"){
+            settings = clever::context_settings::amd_cpu();
+        }else if (exec.computingPlatform == "intel"){
+            settings = clever::context_settings::intel_cpu();
+        }else{
+            settings = clever::context_settings::default_cpu();
+        }
+
         settings.m_profile = true;
         settings.m_cmd_queue_properties |= DEBUG_OCL;
 
-        contx = new clever::context(settings);
         LLOG << "success" << std::endl;
     }
 
-    return contx;
+    return new clever::context(settings);;
 }
 
 std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec,
@@ -348,7 +366,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
                 uint trackLength = vPSum[i + 1] - trackOffset;
                 
             
-                if (trackLength < 0) {
+                if (trackLength >= 1) {
                     continue;
                 }
                
@@ -477,6 +495,10 @@ int main(int argc, char *argv[])
      "number of concurrently processed events")
     ("exec.useCPU", po::value<bool>(&exec.useCPU)->default_value(false)->zero_tokens(),
      "force using CPU instead of GPGPU")
+    
+    ("exec.computingPlatform", po::value<string>(&exec.computingPlatform)->default_value("amd"),
+        "force use of particular platform [amd, nvidia, intel]")
+    
     ("exec.iterations", po::value<uint>(&exec.iterations)->default_value(1),
      "number of iterations for performance evaluation")
     ("exec.layerTripletConfig", po::value<std::string>(&exec.layerTripletConfigFile),
