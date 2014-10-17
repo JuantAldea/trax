@@ -25,7 +25,9 @@ public:
     {
     }
 
-    void run(const clever::vector<uint, 1> &tripletsBasis,
+    //void
+    std::tuple<const clever::vector<uint, 1>*, const clever::vector<uint, 1>*>
+    run(const clever::vector<uint, 1> &tripletsBasis,
              const clever::vector<uint, 1> &tripletsFollowers,
              const clever::vector<float, 1> &tripletsPt,
              const clever::vector<uint, 1> &connectableTriplets,
