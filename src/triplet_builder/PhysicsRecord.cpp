@@ -96,8 +96,8 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
     uint fakeTracks = 0;
     uint foundClones = 0;
 
-    uint nFoundTracklets = tracklets.getTrackletOffsets()[event * nLayerTriplets + layerTriplet +
-                           1] - tracklets.getTrackletOffsets()[event * nLayerTriplets + layerTriplet];
+    uint nFoundTracklets = tracklets.getTrackletOffsets()[event * nLayerTriplets + layerTriplet + 1]
+                            - tracklets.getTrackletOffsets()[event * nLayerTriplets + layerTriplet];
 
     LOG << "Found " << nFoundTracklets << " triplets:" << std::endl;
     for (uint i = tracklets.getTrackletOffsets()[event * nLayerTriplets + layerTriplet];
@@ -108,15 +108,14 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
         float tPt = getPt(Hit(hits, tracklet.hit1()),  Hit(hits, tracklet.hit2()), Hit(hits,
                           tracklet.hit3()));
 
+        //valid triplet
         if (tracklet.isValid(hits)) {
-            //valid triplet
-
-            if (mcTruth.find(tracklet.trackId(hits)) !=
-                    mcTruth.end()) { //  ensure that it is a "findable track" otherwise efficiency greater one possible
-
+            //  ensure that it is a "findable track" otherwise efficiency greater one possible
+            //assert(tracklet.trackId(hits) == tracklet.get)
+            if (mcTruth.find(tracklet.trackId(hits)) != mcTruth.end()) {
                 bool inserted = foundTracks.insert(tracklet.trackId(hits)).second;
-
-                if (inserted) { //found for the first time
+                // was inserted => wasn't found => not a clone.
+                if (inserted) { 
                     eta[getEtaBin(tEta)].valid++;
                     pt[getPtBin(tPt)].valid++;
 
@@ -133,10 +132,16 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
                     rwPt++;*/
 
                     VLOG << zkr::cc::fore::green;
-                    VLOG << "Track " << tracklet.trackId(hits) << " : " << tracklet.hit1() << "-" <<
-                         tracklet.hit2() << "-" << tracklet.hit3();
-                    VLOG << " TIP: " << getTIP(Hit(hits, tracklet.hit1()), Hit(hits, tracklet.hit2()), Hit(hits,
-                                               tracklet.hit3()));
+                    VLOG << "Track " << tracklet.trackId(hits) << " : "
+                         << "tracklet.id() " << tracklet.id() << " : "
+                         << tracklet.hit1() << "-"
+                         << tracklet.hit2() << "-"
+                         << tracklet.hit3();
+
+                    VLOG << " TIP: " << getTIP(Hit(hits, tracklet.hit1()),
+                                         Hit(hits, tracklet.hit2()),
+                                         Hit(hits, tracklet.hit3()));
+
                     VLOG << zkr::cc::console << std::endl;
                 } else {
                     //clone
@@ -158,13 +163,19 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
                     rwPt++;*/
 
                     VLOG << zkr::cc::fore::yellow;
-                    VLOG << "Track " << tracklet.trackId(hits) << " : " << tracklet.hit1() << "-" <<
-                         tracklet.hit2() << "-" << tracklet.hit3();
-                    VLOG << " TIP: " << getTIP(Hit(hits, tracklet.hit1()), Hit(hits, tracklet.hit2()), Hit(hits,
-                                               tracklet.hit3()));
+                    VLOG << "Track " << tracklet.trackId(hits) << " : "
+                         << tracklet.hit1() << "-"
+                         << tracklet.hit2() << "-"
+                         << tracklet.hit3();
+                    
+                    VLOG << " TIP: " << getTIP(Hit(hits, tracklet.hit1()),
+                                               Hit(hits, tracklet.hit2()),
+                                               Hit(hits, tracklet.hit3()));
+
                     VLOG << zkr::cc::console << std::endl;
                 }
-            } else { //not in findable tracks definition but still valid
+            } else {
+                //not in findable tracks definition but still valid
                 eta[getEtaBin(tEta)].misc++;
                 pt[getPtBin(tPt)].misc++;
             }
@@ -223,8 +234,10 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
 
     //std::cout << "correctly calculated: " << cPt << " slightly wrongly calculated: " << swPt << " really wrong " << rwPt << std::endl;
 
-    LOG << "Efficiency: " << efficiencyMean  << " FakeRate: " << fakeRateMean << " CloneRate: " <<
-        cloneRateMean << std::endl;
+    LOG << "Efficiency: " << efficiencyMean
+        << " FakeRate: " << fakeRateMean
+        << " CloneRate: " << cloneRateMean
+        << std::endl;
     //histo.close();
 }
 
