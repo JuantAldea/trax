@@ -263,7 +263,8 @@ public:
 
 
     // TODO I don't see how the offset list couldn't be monotonous since
-    // event, layerTriplets and gid increase monotonically 
+    // event, layerTriplets and gid should increase monotonically.
+    // In case they don't, this function could mask the problem.
     KERNEL_CLASSP(filterOffsetMonotonizeStore,
                   oclDEFINES,
 
