@@ -33,6 +33,8 @@ public:
     typedef std::deque<PB_Event::PHit> tTrackHits;
     //key = trackID, value trackDeque --> easy application of cuts
     typedef std::map<uint, tTrackHits> tTrackList;
+    typedef std::map<uint, std::deque<uint>> tTrackListIDs;
+    
     typedef tTrackList::value_type tTrackListEntry;
 
     HitCollection()
@@ -40,7 +42,7 @@ public:
 
     }
 
-    HitCollection(int items) :
+    HitCollection(const uint items) :
         clever::Collection<HIT_COLLECTION_ITEMS>(items)
     {
 

@@ -58,8 +58,8 @@ HitCollection::tTrackList HitCollection::addEvent(const PB_Event::PEvent& event,
         [](const PB_Event::PHit & a, const PB_Event::PHit & b) {
         return a.layer() < b.layer();
     });
- 	
- 	// hits bucket sorted into layers
+    
+    // hits bucket sorted into layers
     tTrackList layers;
     //findable tracks = collection of tracks that count towards efficiency
     tTrackList findableTracks;
@@ -88,7 +88,7 @@ HitCollection::tTrackList HitCollection::addEvent(const PB_Event::PEvent& event,
             }
         }
 
-        //skip tracks with to low pt
+        //skip tracks with too low pt
         if (itTrack->second[0].simtrackpt() < minPt) {
             continue;
         }
@@ -107,7 +107,7 @@ HitCollection::tTrackList HitCollection::addEvent(const PB_Event::PEvent& event,
         }
     }
 
-    //bucket sort findable trakc hits into layers
+    //bucket sort findable track hits into layers
     for (tTrackList::const_iterator itTrack = findableTracks.begin();
             itTrack != findableTracks.end(); ++itTrack) {
         for (auto& hit : itTrack->second) {
@@ -133,6 +133,7 @@ HitCollection::tTrackList HitCollection::addEvent(const PB_Event::PEvent& event,
     eventSupplement[evtInGroup].setOffset(offset);
 
     //add hits in order of layers to HitCollection
+    tTrackListIDs trackListNewIDs;
     for (uint i = 1; i <= maxLayer; ++i) {
         PLOG << "Layer " << i << std::endl;
 
@@ -148,22 +149,27 @@ HitCollection::tTrackList HitCollection::addEvent(const PB_Event::PEvent& event,
             int id = addWithValue(hit.position().x(), hit.position().y(),
                                   hit.position().z(), hit.layer(), detId,
                                   hit.simtrackid(), evtInGroup);
-
-            PLOG << "\t [" << id << "] Track: " << hit.simtrackid() << " DetId: " << detId;
-            PLOG << "\t\t [" << hit.position().x() << ", " <<  hit.position().y() << ", " <<
-                 hit.position().z() << "]";
+            
+            trackListNewIDs[hit.simtrackid()].push_back(id);
+            
+            PLOG << "\t[" << id << "] Track: " << hit.simtrackid() << " DetId: " << detId;
+            PLOG << "\t\t["
+                 << hit.position().x() << ", "
+                 << hit.position().y() << ", "
+                 << hit.position().z() << "]";
             PLOG << std::endl;
         }
     }
 
     uint i = 0;
-    for (tTrackList::const_iterator itTrack = findableTracks.begin();
-            itTrack != findableTracks.end(); ++itTrack) {
+    for (tTrackListIDs::const_iterator itTrack = trackListNewIDs.begin();
+            itTrack != trackListNewIDs.end(); ++itTrack) {
         PLOG << "FTRACK #" << itTrack->first << " " << std::endl;
+        PLOG << "\t[";
         for (auto& hit : itTrack->second) {
-            PLOG << "\t[" << hit.position().x() << ' ' << hit.position().y() << ' ' << hit.position().z()
-                 << "]" << std::endl;
+            PLOG << hit << "-";
         }
+        PLOG << "]" << std::endl;
         PLOG << std::endl;
         i++;
     }
