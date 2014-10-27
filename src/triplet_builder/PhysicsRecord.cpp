@@ -84,7 +84,7 @@ tCircleParams PhysicsRecord::getCircleParams(const Hit & p1, const Hit & p2,
 }
 
 void PhysicsRecord::fillData(const TrackletCollection& tracklets,
-                             const HitCollection::tTrackList& mcTruth, const HitCollection& hits, uint nLayerTriplets)
+                             const HitCollection::tTrackList& mcTruth, const HitCollection& hits, uint nLayerTriplets, std::map<uint, std::vector<uint>> &tracks)
 {
     LOG << "Evaluating event " << event << " layer triplet " << layerTriplet  << std::endl;
 
@@ -110,8 +110,7 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
 
         //valid triplet
         if (tracklet.isValid(hits)) {
-            //  ensure that it is a "findable track" otherwise efficiency greater one possible
-            //assert(tracklet.trackId(hits) == tracklet.get)
+            // ensure that it is a "findable track" otherwise efficiency greater one possible
             if (mcTruth.find(tracklet.trackId(hits)) != mcTruth.end()) {
                 bool inserted = foundTracks.insert(tracklet.trackId(hits)).second;
                 // was inserted => wasn't found => not a clone.
@@ -133,20 +132,36 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
 
                     VLOG << zkr::cc::fore::green;
                     VLOG << "Track " << tracklet.trackId(hits) << " : "
-                         << "tracklet.id() " << tracklet.id() << " : "
                          << tracklet.hit1() << "-"
                          << tracklet.hit2() << "-"
                          << tracklet.hit3();
 
+                    bool keepDuplicates = false;
+                    auto &trackVector = tracks[tracklet.trackId(hits)];
+                    if(keepDuplicates || std::find(trackVector.begin(), trackVector.end(), tracklet.hit1()) == trackVector.end()){
+                        trackVector.push_back(tracklet.hit1());
+                    }
+                    
+                    if(keepDuplicates || std::find(trackVector.begin(), trackVector.end(), tracklet.hit2()) == trackVector.end()){
+                        trackVector.push_back(tracklet.hit2());
+                    }
+                    
+                    if(keepDuplicates || std::find(trackVector.begin(), trackVector.end(), tracklet.hit3()) == trackVector.end()){
+                        trackVector.push_back(tracklet.hit3());
+                    }
+                    
+
                     VLOG << " TIP: " << getTIP(Hit(hits, tracklet.hit1()),
                                          Hit(hits, tracklet.hit2()),
                                          Hit(hits, tracklet.hit3()));
+                    VLOG << " ETA: " << tEta;
+                                         
+                    VLOG << " PT: " << tPt;
 
                     VLOG << zkr::cc::console << std::endl;
                 } else {
                     //clone
                     ++foundClones;
-
                     eta[getEtaBin(tEta)].clones++;
                     pt[getPtBin(tPt)].clones++;
 
@@ -161,9 +176,9 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
                     swPt++;
                     else
                     rwPt++;*/
-
+                    VLOG << "\t\t";
                     VLOG << zkr::cc::fore::yellow;
-                    VLOG << "Track " << tracklet.trackId(hits) << " : "
+                    VLOG << "Track CLONE:" << tracklet.trackId(hits) << " : "
                          << tracklet.hit1() << "-"
                          << tracklet.hit2() << "-"
                          << tracklet.hit3();
@@ -171,7 +186,9 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
                     VLOG << " TIP: " << getTIP(Hit(hits, tracklet.hit1()),
                                                Hit(hits, tracklet.hit2()),
                                                Hit(hits, tracklet.hit3()));
-
+                    VLOG << " ETA: " << tEta;
+                                         
+                    VLOG << " PT: " << tPt;
                     VLOG << zkr::cc::console << std::endl;
                 }
             } else {
@@ -187,11 +204,22 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
             pt[getPtBin(tPt)].fake++;
 
             VLOG << zkr::cc::fore::red;
-            VLOG << "Fake: " << tracklet.hit1() << "[" << hits.getValue(HitId(), tracklet.hit1()) << "]";
-            VLOG << "-" << tracklet.hit2() << "[" << hits.getValue(HitId(), tracklet.hit2()) << "]";
-            VLOG << "-" << tracklet.hit3() << "[" << hits.getValue(HitId(), tracklet.hit3()) << "]";
+            VLOG << "Fake: "
+                << "[" << tracklet.hit1()
+                << "-" << tracklet.hit2()
+                << "-" << tracklet.hit3()
+                << "]";
+            VLOG << " Original tracks: "
+                 << "[" << hits.getValue(HitId(), tracklet.hit1())
+                 << "-" << hits.getValue(HitId(), tracklet.hit2())
+                 << "-" << hits.getValue(HitId(), tracklet.hit3())
+                 << "]";
             VLOG << " TIP: " << getTIP(Hit(hits, tracklet.hit1()), Hit(hits, tracklet.hit2()), Hit(hits,
                                        tracklet.hit3()));
+            VLOG << " ETA: " << tEta;
+                                         
+            VLOG << " PT: " << tPt;
+            
             VLOG << zkr::cc::console << std::endl;
         }
     }

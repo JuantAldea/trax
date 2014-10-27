@@ -110,7 +110,7 @@ public:
         pt(0.1), eta(0.1) { }
 
     void fillData(const TrackletCollection & tracklets, const HitCollection::tTrackList & mcTruth,
-                  const HitCollection & hits, uint nLayerTriplets);
+                  const HitCollection & hits, uint nLayerTriplets, std::map<uint, std::vector<uint>> &tracks);
 
     void merge(const PhysicsRecord & c);
 
@@ -182,8 +182,8 @@ private:
 
     double getPt(tCircleParams params) const   //in [GeV/c]
     {
-        return Q * BZ * (params.radius * 1E-2) /
-               GEV_C; //convert radius from cm to meter and then to GEV/c
+        //convert radius from cm to meter and then to GEV/c
+        return Q * BZ * (params.radius * 1E-2) / GEV_C; 
     }
 
     double getPtBin(double pt_) const
