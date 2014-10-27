@@ -50,6 +50,8 @@
 #include "lib/ccolor.h"
 #include "lib/CSV.h"
 
+#include "fastfitters/GlobalPoint.h"
+#include "fastfitters/FastHelix.h"
 
 std::string g_traxDir;
 
@@ -286,6 +288,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             runtime.buildGrid.stopWalltime();
 
             /****************************/
+
             // print updated hit information
             PLOG << "UPDATED HIT IDS" << std::endl;
             for (uint i = 0; i < hits.size(); i++){
@@ -297,6 +300,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
                      << ", " << hits.getValue(GlobalZ(), i)
                      << "]" << std::endl;
             }
+
             /****************************/
 
             //run it
@@ -310,46 +314,84 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 
             runtime.tripletPredict.startWalltime();
             Pairing * tripletCandidates = predictor.run(hits, geom, geomSupplement, dict, exec.threads,
-                                          layerConfig, grid, *pairs, true);
+                                          layerConfig, grid, *pairs, false);
             runtime.tripletPredict.stopWalltime();
 
             TripletThetaPhiFilter tripletThetaPhi(*contx);
 
             runtime.tripletFilter.startWalltime();
             TrackletCollection * tracklets = tripletThetaPhi.run(hits, grid, *pairs, *tripletCandidates,
-                                             exec.threads, layerConfig, true);
+                                             exec.threads, layerConfig, false);
             runtime.tripletFilter.stopWalltime();
 
             /*******************************************/
+            std::map<uint, std::vector<uint>> tracks;
+            for (uint i = 0; i < hits.size(); i++){
+                tracks[hits.getValue(HitId(), i)].push_back(i);
+                std::sort(tracks[hits.getValue(HitId(), i)].begin(), tracks[hits.getValue(HitId(), i)].end());
+            }
 
+            int trackNumber = 1;
+            for (auto it=tracks.begin(); it!=tracks.end(); ++it){
+                std::cout << "#" << trackNumber << " SIMULATED " << it->first << " => ";
+                trackNumber++;
+                auto track = it->second;
+                for(auto it2 = track.begin(); it2 != track.end(); it2++){
+                    std::cout << *it2 << '-';
+                }
+                std::cout << std::endl;
+            }
 
             // On average a dEta = 0.0256 cut reduces the amount of triplets pairs by a 33.7% (stdev 19.6)
             TripletConnectivityTight tripletConnectivityTight(*contx);
+            //float dEtaCut  = 0.0256;
             float dEtaCut  = 0.0256;
             runtime.tripletConnectivity.startWalltime();
             auto connectableTrackletsPairIndices = tripletConnectivityTight.run(hits, *tracklets, dEtaCut,
-                                                   exec.threads, false);
+                                                   exec.threads, true);
             runtime.tripletConnectivity.stopWalltime();
 
             //tripletConnectivityTight.run(hits, *tracklets, dEtaCut, exec.threads, true);
             //std::cerr << tracklets->size() << std::endl;
 
-            // TODO filter the stream here, we dont want gaps neither for the fitting nor for the CA.
+            // TODO filter the stream here maybe?, we dont want gaps neither for the fitting nor for the CA.
+
             runtime.trackletCircleFitter.startWalltime();
+            
+            #define USE_FAST_FITTERS
+            #ifdef USE_FAST_FITTERS
+                        
+            std::vector<float>vPT(tracklets->size());
+            for (uint i=0; i< tracklets->size(); i++){
+                uint hit1 = tracklets->getValue(TrackletHit1(), i);
+                uint hit2 = tracklets->getValue(TrackletHit2(), i);
+                uint hit3 = tracklets->getValue(TrackletHit3(), i);
+                GlobalPoint vertex(hits.getValue(GlobalX(), hit1), hits.getValue(GlobalY(), hit1), hits.getValue(GlobalZ(), hit1));
+                GlobalPoint middle(hits.getValue(GlobalX(), hit2), hits.getValue(GlobalY(), hit2), hits.getValue(GlobalZ(), hit2));
+                GlobalPoint outer (hits.getValue(GlobalX(), hit3), hits.getValue(GlobalY(), hit3), hits.getValue(GlobalZ(), hit3));
+                
+                //vPT[i] = length(FastHelix(outer, middle, vertex, 3.8112).getPt());
+                vPT[i] = FastHelix(outer, middle, vertex, 3.8112).getPtMagnitude();
+            }
+            // copy vPT to tripletPT
+            clever::vector<float, 1> * const tripletPt  = new clever::vector<float, 1>(vPT.size(), *contx);
+            contx->transfer_to_buffer(tripletPt->get_mem(), vPT.data(), sizeof(cl_float) * tripletPt->get_count());
+
+            #else
             TrackletCircleFitter trackletCircleFitter(*contx);
             auto tripletPt = trackletCircleFitter.run(hits, *tracklets,
-                             *std::get<2>(connectableTrackletsPairIndices), exec.threads, false);
+                             *std::get<2>(connectableTrackletsPairIndices), exec.threads, true);
+            #endif
+            
             runtime.trackletCircleFitter.stopWalltime();
-
+            
             runtime.cellularAutomaton.startWalltime();
-
             CellularAutomaton cellularAutomaton(*contx);
             auto caOutput = cellularAutomaton.run(*std::get<0>(connectableTrackletsPairIndices),
                                   *std::get<1>(connectableTrackletsPairIndices),
                                   *tripletPt,
                                   *std::get<2>(connectableTrackletsPairIndices),
                                   exec.threads, true);
-
             runtime.cellularAutomaton.stopWalltime();
 
 
@@ -360,34 +402,194 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             transfer::download(*std::get<1>(caOutput), vPSum, *contx);
             int iTrack = 0;
             PLOG << "OUTSIDE" << std::endl;
+            std::map<uint, bool> foundTracks;
+
+            std::deque<std::vector<uint>*> trackCollection;
             for (uint i = 0; i < vPSum.size() - 1; i++) {
 
                 uint trackOffset = vPSum[i];
                 uint trackLength = vPSum[i + 1] - trackOffset;
                 
-            
-                if (trackLength >= 1) {
+                if (trackLength < 3) {
                     continue;
                 }
-               
-                 //the triplet is a handler.
+                
+                std::vector<uint>* track = new std::vector<uint>();
+                for (uint j = 0; j < trackLength; j++) {
+                    uint triplet = vTrackCollection[trackOffset + (trackLength - 1 - j)];
+                    uint hit1 = tracklets->getValue(TrackletHit1(), triplet);
+                    uint hit2 = tracklets->getValue(TrackletHit2(), triplet);
+                    uint hit3 = tracklets->getValue(TrackletHit3(), triplet);
+                    if(track->size() == 0){
+                        track->push_back(hit1);
+                        track->push_back(hit2);
+                    }
+                    track->push_back(hit3);
+                }
+                trackCollection.push_back(track);
+            }
+
+            std::set<uint> tracksToRemove;
+
+            for (uint i = 0; i < trackCollection.size(); i++){
+                std::vector<uint> *track = trackCollection[i];    
+                if(tracksToRemove.find(i) != tracksToRemove.end()){
+                    continue;
+                }
+
+                
+                for(uint j = i + 1; j < trackCollection.size(); j++){
+                    std::vector<uint> *track2 = trackCollection[j];
+                    if(tracksToRemove.find(j) != tracksToRemove.end()){
+                        continue;
+                    }
+
+                    if(tracksToRemove.find(i) != tracksToRemove.end()){
+                        break;
+                    }
+
+                    if (track2->size() == track->size()){
+                        continue;
+                    }
+                    std::vector<uint> *longerTrack;
+                    std::vector<uint> *shorterTrack;
+                    uint removed;
+                    uint remover;
+                    if(track2->size() > track->size()){
+                        longerTrack = track2;
+                        shorterTrack = track;
+                        removed = i;
+                        remover = j;
+                    }else {
+                        longerTrack = track;
+                        shorterTrack = track2;
+                        removed = j;
+                        remover = i;
+                    }
+                    uint sharedHits = 0;
+                    for (auto hit : *shorterTrack){
+                        if (std::find(longerTrack->begin(), longerTrack->end(), hit) != longerTrack->end()){
+                            sharedHits++;
+                        }
+                    }
+                    float fshared = sharedHits/float(shorterTrack->size());
+                    if (fshared >= 0.19){
+                        PLOG << "FSHARED " << fshared << std::endl;;
+                        tracksToRemove.insert(removed);
+                        PLOG << "REMOVED-SHARED " <<  remover << " removes " << removed << std::endl;
+                        for (auto hit : *track){
+                            PLOG << hit << '-';
+                        }
+                        PLOG << std::endl;
+                        for (auto hit : *track2){
+                            PLOG << hit << '-';
+                        }
+                        PLOG << std::endl;
+                    }
+                    
+                }
+            }
+
+            for(auto it = tracksToRemove.begin(); it != tracksToRemove.end(); it++){
+                //trackCollection.erase(std::find(trackCollection.begin(), trackCollection.end(), *it));
+                PLOG << "REMOVED" << *it << std::endl;
+            }
+
+            for (uint i = 0; i < vPSum.size() - 1; i++) {
+
+                uint trackOffset = vPSum[i];
+                uint trackLength = vPSum[i + 1] - trackOffset;
+                
+                if (trackLength < 3) {
+                    continue;
+                }
+                PLOG << "buscando " << i << std::endl;
+                if (std::find(tracksToRemove.begin(), tracksToRemove.end(), uint(i)) != tracksToRemove.end()){
+                    PLOG << "Track #" << iTrack << " was deleted" << std::endl;
+                    continue;
+                }
+
+                iTrack++;
+                //the triplet is a handler.
                 PLOG << "Track #" << iTrack
                      << " with triplet length " << trackLength
                      << " begins at " << trackOffset
                      << std::endl;
-                PLOG << "\tTriplets #: ";
+                PLOG << "\tTriplets: ";
                 
+                std::vector<uint> trackIDs;
+                bool monotonicDecreasingPt = true;
+                float previousPt = std::numeric_limits<float>::max();
+                std::vector<float> vPt(tripletPt->get_count());
+                transfer::download(*tripletPt, vPt, *contx);
                 
                 for (uint j = 0; j < trackLength; j++) {
-                    PLOG << "[" << tracklets->getValue(TrackletHit1(), vTrackCollection[trackOffset + (trackLength - 1 -j)])
-                         << "-"<< tracklets->getValue(TrackletHit2(), vTrackCollection[trackOffset + (trackLength - 1 -j)])
-                         << "-"<< tracklets->getValue(TrackletHit3(), vTrackCollection[trackOffset + (trackLength - 1 -j)])
+                    uint triplet = vTrackCollection[trackOffset + (trackLength - 1 - j)];
+                    uint hit1 = tracklets->getValue(TrackletHit1(), triplet);
+                    uint hit2 = tracklets->getValue(TrackletHit2(), triplet);
+                    uint hit3 = tracklets->getValue(TrackletHit3(), triplet);
+                    
+                    trackIDs.push_back(hits.getValue(HitId(), hit1));
+                    trackIDs.push_back(hits.getValue(HitId(), hit2));
+                    trackIDs.push_back(hits.getValue(HitId(), hit3));
+
+                    PLOG << "[" << hit1 << "-"<< hit2 << "-"<< hit3 << "]";
+                    PLOG << " Pt = " << vPt[triplet] << " ";
+                    monotonicDecreasingPt &= (vPt[triplet] - previousPt) < 1;
+                    previousPt = vPt[triplet];
+                }
+                
+                PLOG << "\tTrack IDs #: ";
+                bool same = true;
+                uint trackId;
+                for (auto it = trackIDs.begin(); it != trackIDs.end(); it++){
+                    if (*it != *trackIDs.begin()){
+                        same = false;
+                    }
+                    trackId = *trackIDs.begin();
+                }
+                
+                for (auto it = trackIDs.begin(); it != trackIDs.end(); it++){
+                    PLOG << *it << " ";
+                }
+                
+                if (same){
+                    if(monotonicDecreasingPt){
+                        foundTracks[trackId] = true;
+                        PLOG << " =====================> RECONSTRUCTED-SUCCESS-MONOTONIC";
+                    }else{
+                        PLOG << " =====================> RECONSTRUCTED-SUCCESS-NON-MONOTONIC";
+                    }
+                }else if(monotonicDecreasingPt) {
+                    PLOG << " =====================> RECONSTRUCTED-FAILURE-MONOTONIC";
+                }else{
+                    PLOG << " =====================> RECONSTRUCTED-FAILURE-NON-MONOTONIC";
+                }
+
+
+                trackIDs.clear();
+                PLOG << std::endl;
+
+                PLOG << "\tHits X: ";
+                for (uint j = 0; j < trackLength; j++) {
+                    uint hit1 = tracklets->getValue(TrackletHit1(), vTrackCollection[trackOffset + (trackLength - 1 - j)]);
+                    uint hit2 = tracklets->getValue(TrackletHit2(), vTrackCollection[trackOffset + (trackLength - 1 - j)]);
+                    uint hit3 = tracklets->getValue(TrackletHit3(), vTrackCollection[trackOffset + (trackLength - 1 - j)]);
+                        
+                    PLOG << "[" << hits.getValue(GlobalX(), hit1)
+                         << ", " << hits.getValue(GlobalX(), hit2)
+                         << ", " << hits.getValue(GlobalX(), hit3) 
                          << "]";
                 }
-             
-                iTrack++;
                 PLOG << std::endl << std::endl;
             }
+
+            trackNumber = 1;
+            for (auto it = foundTracks.begin(); it != foundTracks.end(); it++){
+                PLOG << "#" << trackNumber <<" UNIQUE " << it->first << std::endl;
+                trackNumber++;
+            }
+
             /*******************************************/
             
             delete std::get<0>(connectableTrackletsPairIndices);
@@ -405,16 +607,24 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             runtime.fillRuntimes(*contx);
             runtime.logPrint();
             runtimeRecords.addRecord(runtime);
-
+            std::map<uint, std::vector<uint>> data;
             //physics
             for (uint e = 0; e < grid.config.nEvents; ++e) {
                 for (uint p = 0; p < layerConfig.size(); ++p) {
                     PhysicsRecord physics(e, p);
-                    physics.fillData(*tracklets, validTracks[e], hits, layerConfig.size());
+                    physics.fillData(*tracklets, validTracks[e], hits, layerConfig.size(), data);
                     physicsRecords.addRecord(physics);
                 }
             }
 
+            for (auto it=data.begin(); it!=data.end(); ++it){
+                std::cout << "TRACK " << it->first << " => ";
+                auto track = it->second;
+                for(auto it2 = track.begin(); it2 != track.end(); it2++){
+                    std::cout << *it2 << '-';
+                }
+                std::cout << std::endl;
+            }
             //delete variables
             delete pairs;
             delete tripletCandidates;
@@ -429,16 +639,12 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             TripletConnectivityTight::clearEvents();
             TrackletCircleFitter::clearEvents();
             CellularAutomaton::clearEvents();
-            break;
+            //break;
         }
 
         delete edLoader;
-        //{int a; std::cout << "READKEY Out1" << std::endl; std::cin >> a;}
-
     } //destruction order block
 
-    //delete contx;
-    //{int a; std::cout << "READKEY Out2" << std::endl; std::cin >> a;}
     return std::make_pair(runtimeRecords, physicsRecords);
 }
 

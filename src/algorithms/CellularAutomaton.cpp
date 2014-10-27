@@ -12,7 +12,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
                             bool printPROLIX) const
 {
     LOG << std::endl << "BEGIN CellularAutomaton" << std::endl;
-/*
+    /*
     if (((PROLIX) && printPROLIX)) {
         LOG << std::endl << "TripletPairs:" << std::endl;
         std::vector<uint> vBasis(tripletsBasis.get_count());
@@ -25,7 +25,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
             PLOG << "TP-CPU# " << i << " " << vBasis[i] << " -> " << vFollowers[i] << std::endl;
         }
     }
-*/
+    */
     const uint nTripletPairs = tripletsBasis.get_count();
     const uint nTriplets = tripletsPt.get_count();
     const uint nGroupsForTriplets = uint(std::max(1.0f, ceil(float(nTriplets) / nThreads)));
@@ -84,9 +84,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
                  << aliveCells << " alive cells." << std::endl;
         }
     } while (aliveCells > 0);
-
-    LOG << std::endl << "CA forward phase done." << std::endl;
-/*
+    /*
     if (((PROLIX) && printPROLIX)) {
         std::vector<uint> vTBasis(tripletsBasis.get_count());
         transfer::download(tripletsBasis, vTBasis, ctx);
@@ -116,7 +114,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
                  << std::endl;
         }
     }
-*/
+  */
     LOG << std::endl << "Runing CA, backward phase." << std::endl;
     LOG << std::endl;
     LOG << "Counting basis for a given follower." << "triplets: "
@@ -138,7 +136,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
               range(nGroupsForPairs * nThreads),
               range(nThreads));
     CellularAutomaton::events.push_back(evt);
-/*
+    /*
     if (((PROLIX) && printPROLIX)) {
         LOG << std::endl << "Basis for a given follower:" << std::endl;
         std::vector<uint> vfollowerBasisCountPrefixSum(followerBasisCountPrefixSum->get_count());
@@ -151,7 +149,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
             PLOG << "BASIS COUT# " << i << " " << vfollowerBasisCountPrefixSum[i] << std::endl;
         }
     }
-*/
+    */
     evt = prefixSum.run(
               followerBasisCountPrefixSum->get_mem(),
               followerBasisCountPrefixSum->get_count(),
@@ -165,7 +163,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
 
     LOG << std::endl << "Number of triplets with basis: "
         << followerBasisCountPrefixSumTotal << std::endl;
-/*
+    /*
     if (((PROLIX) && printPROLIX)) {
         LOG << std::endl << "Prefix sum of basis count:" << std::endl;
         std::vector<uint> vfollowerBasisCountPrefixSum(followerBasisCountPrefixSum->get_count());
@@ -183,7 +181,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
             }
         }
     }
-*/
+    */
     //anotate Pt and indices of basis for a given triplet in adyacent positions
     clever::vector<uint, 1> * const followerBasisIndices
                 = new clever::vector<uint, 1> (followerBasisCountPrefixSumTotal, ctx);
@@ -219,7 +217,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
     CellularAutomaton::events.push_back(evt);
 
     delete followerBasisCountPrefixSumForStorage;
-/*
+    
     if (((PROLIX) && printPROLIX)) {
         LOG << std::endl << "Basis index and Pt difference:" << std::endl;
         std::vector<uint> vFollowerBasisIndices(followerBasisIndices->get_count());
@@ -253,7 +251,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
             PLOG << "------------------------------------" << std::endl;
         }
     }
-*/
+    
     LOG << "Calculating the best basis for each follower...";
     // this two cannont be merged using MAX_INT as IS NOT A BEST BASIS->is a handler.
     // because then we cannot count and perform prefix sum directly.
@@ -276,7 +274,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
               range(nThreads));
     CellularAutomaton::events.push_back(evt);
     LOG << "done." << std::endl;
-/*
+    /*
     if (((PROLIX) && printPROLIX)) {
         LOG << std::endl << "Basis index and pt difference:" << std::endl;
         std::vector<uint> vFollowerBestBasisIndices(followerBestBasisIndices->get_count());
@@ -297,7 +295,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
                  << " has follower: " <<  vTripletIsBestBasisForFollower[triplet] << std::endl;
         }
     }
-*/
+    */
     LOG << "Storing the state of the handlers...";
     clever::vector<uint, 1> * const tripletHandlersStatePrefixSum = new clever::vector<uint, 1>
     (nTriplets + 1, ctx);
@@ -314,7 +312,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
               range(nThreads));
     CellularAutomaton::events.push_back(evt);
     LOG << "done." << std::endl;
-/*
+
     if (((PROLIX) && printPROLIX)) {
         LOG << std::endl << "Handlers state:" << std::endl;
         std::vector<uint> vHandlersState(tripletHandlersStatePrefixSum->get_count());
@@ -332,7 +330,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
                  " is best basis: " << vTripletIsBestBasisForFollower[triplet] << std::endl;
         }
     }
-*/
+
     LOG << "Computing prefix sum of the state of handlers...";
     evt = prefixSum.run(
               tripletHandlersStatePrefixSum->get_mem(),
@@ -347,7 +345,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
     
     LOG << "[done]. Produced a total of " << trackCollectionLength
         << " triplet tracks." << std::endl;
-/*
+    /*
     if (((PROLIX) && printPROLIX)) {
         LOG << std::endl << "Handlers storage offset:" << std::endl;
         std::vector<uint> vHandlersStatePrefixSum(tripletHandlersStatePrefixSum->get_count());
@@ -370,7 +368,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
                  (vTripletIsBestBasisForFollower[triplet] ? "Yes" : "No")  << std::endl;
         }
     }
-*/
+    */
     LOG << "Storing track collection (as triplet list)...";
     clever::vector<uint, 1> * const trackCollection
                     = new clever::vector<uint, 1> (trackCollectionLength, ctx);
@@ -388,7 +386,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
               range(nThreads));
     CellularAutomaton::events.push_back(evt);
     LOG << "[" << trackCollectionLength << "] done.";
-/*
+    /*
     if (((PROLIX) && printPROLIX)) {
         LOG << std::endl << "Tracks:" << std::endl;
         std::vector<uint> vHandlersStatePrefixSum(tripletHandlersStatePrefixSum->get_count());
@@ -421,7 +419,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
             iTrack++;
         }
     }
-*/
+    */
     delete tripletsStates;
     delete tripletNextState;
     delete livingCells;
