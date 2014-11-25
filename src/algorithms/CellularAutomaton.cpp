@@ -3,13 +3,14 @@
 #include <limits>
 
 std::tuple<const clever::vector<uint, 1>*, const clever::vector<uint, 1>*>
-//void 
+//void
 CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
-                            const clever::vector<uint, 1> &tripletsFollowers,
-                            const clever::vector<float, 1> &tripletsPt,
-                            const clever::vector<uint, 1> &connectableTriplets,
-                            const uint nThreads,
-                            bool printPROLIX) const
+                       const clever::vector<uint, 1> &tripletsFollowers,
+                       const clever::vector<float, 1> &tripletsPt,
+                       //only for debugging
+                       const clever::vector<uint, 1> &connectableTriplets,
+                       const uint nThreads,
+                       bool printPROLIX) const
 {
     LOG << std::endl << "BEGIN CellularAutomaton" << std::endl;
     /*
@@ -74,7 +75,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
                   CellularAutomaton::events);
         CellularAutomaton::events.push_back(evt);
 
-        transfer::downloadScalar(*livingCells, aliveCells, ctx, true, 
+        transfer::downloadScalar(*livingCells, aliveCells, ctx, true,
                                  livingCells->get_count() - 1, 1, &evt);
 
         std::swap(tripletsStates, tripletNextState);
@@ -114,15 +115,15 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
                  << std::endl;
         }
     }
-  */
+    */
     LOG << std::endl << "Runing CA, backward phase." << std::endl;
     LOG << std::endl;
     LOG << "Counting basis for a given follower." << "triplets: "
         << nTriplets << "triplet pairs: " << nTripletPairs << std::endl;
 
     clever::vector<uint, 1> * const followerBasisCountPrefixSum
-                = new clever::vector<uint, 1>(0, nTriplets + 1, ctx);
-    
+        = new clever::vector<uint, 1>(0, nTriplets + 1, ctx);
+
     evt = followerBasisCount.run(
               //input
               tripletsBasis.get_mem(),
@@ -184,13 +185,13 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
     */
     //anotate Pt and indices of basis for a given triplet in adyacent positions
     clever::vector<uint, 1> * const followerBasisIndices
-                = new clever::vector<uint, 1> (followerBasisCountPrefixSumTotal, ctx);
-    
+        = new clever::vector<uint, 1> (followerBasisCountPrefixSumTotal, ctx);
+
     clever::vector<float, 1> * const followerBasisPtDiff
-                = new clever::vector<float, 1> (followerBasisCountPrefixSumTotal, ctx);
+        = new clever::vector<float, 1> (followerBasisCountPrefixSumTotal, ctx);
 
     clever::vector<uint, 1> * followerBasisCountPrefixSumForStorage
-                = new clever::vector<uint, 1> (followerBasisCountPrefixSum->get_count(), ctx);
+        = new clever::vector<uint, 1> (followerBasisCountPrefixSum->get_count(), ctx);
 
     evt = memcpy.run(followerBasisCountPrefixSum->get_mem(),
                      followerBasisCountPrefixSumForStorage->get_mem(),
@@ -217,7 +218,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
     CellularAutomaton::events.push_back(evt);
 
     delete followerBasisCountPrefixSumForStorage;
-    
+
     if (((PROLIX) && printPROLIX)) {
         LOG << std::endl << "Basis index and Pt difference:" << std::endl;
         std::vector<uint> vFollowerBasisIndices(followerBasisIndices->get_count());
@@ -251,14 +252,14 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
             PLOG << "------------------------------------" << std::endl;
         }
     }
-    
+
     LOG << "Calculating the best basis for each follower...";
     // this two cannont be merged using MAX_INT as IS NOT A BEST BASIS->is a handler.
     // because then we cannot count and perform prefix sum directly.
-    clever::vector<uint, 1> * const followerBestBasisIndices = new clever::vector<uint, 1>
-    (std::numeric_limits<uint>::max(), nTriplets, ctx);
-    clever::vector<uint, 1> * const tripletIsBestBasisForFollower = new clever::vector<uint, 1>
-    (nTriplets, ctx);
+    clever::vector<uint, 1> * const followerBestBasisIndices
+        = new clever::vector<uint, 1> (std::numeric_limits<uint>::max(), nTriplets, ctx);
+    clever::vector<uint, 1> * const tripletIsBestBasisForFollower
+        = new clever::vector<uint, 1> (0, nTriplets, ctx);
     evt = followerBestBasisStore.run(
               //input
               followerBasisCountPrefixSum->get_mem(),
@@ -342,7 +343,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
     uint trackCollectionLength;
     transfer::downloadScalar(*tripletHandlersStatePrefixSum, trackCollectionLength, ctx, true,
                              tripletHandlersStatePrefixSum->get_count() - 1, 1, &evt);
-    
+
     LOG << "[done]. Produced a total of " << trackCollectionLength
         << " triplet tracks." << std::endl;
     /*
@@ -371,7 +372,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
     */
     LOG << "Storing track collection (as triplet list)...";
     clever::vector<uint, 1> * const trackCollection
-                    = new clever::vector<uint, 1> (trackCollectionLength, ctx);
+        = new clever::vector<uint, 1> (trackCollectionLength, ctx);
 
     evt = trackCollectionStore.run(
               //input
@@ -400,7 +401,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
 
             uint trackOffset = vHandlersStatePrefixSum[i];
             uint trackLength = vHandlersStatePrefixSum[i + 1] - trackOffset;
-            
+
             if (trackLength < 3) {
                 continue;
             }
@@ -409,12 +410,12 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
             PLOG << "Track #" << iTrack
                  << " with triplet length " << trackLength
                  << " begins at " << trackOffset << std::endl;
-            
+
             PLOG << "\tTriplets #: ";
             for (uint j = 0; j < trackLength; j++) {
                 PLOG << vTrackCollection[trackOffset + j] << " ";
             }
-            
+
             PLOG << std::endl << std::endl;
             iTrack++;
         }
