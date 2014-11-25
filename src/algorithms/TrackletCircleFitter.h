@@ -19,7 +19,7 @@ public:
         trackletCircleFitterStore(context)
     {
     }
-    
+
     clever::vector<float, 1>* run(const HitCollection &hits,
                                   const TrackletCollection &tracklets,
                                   const clever::vector<uint, 1> &validTrackletsIndices,
@@ -48,18 +48,16 @@ public:
             return;
         }
 
-        const uint triplet_index = validTrackletsIndices[gid];
-        const uint innerHit = h0[triplet_index];
-        const uint middleHit = h1[triplet_index];
-        const uint outerHit = h2[triplet_index];
+        const uint tripletIndex = validTrackletsIndices[gid];
+        const uint innerHit = h0[tripletIndex];
+        const uint middleHit = h1[tripletIndex];
+        const uint outerHit = h2[tripletIndex];
         // TODO this code needs to be benchmarked. opencl float3 are actually float4
         // so it might be wasting registers.
-        // It also looks like Nvida and AMD cards are scalar nowadays.
         const float3 hit0 = (float3)(hitX[innerHit], hitY[innerHit], hitZ[innerHit]);
-
         const float3 hit1 = (float3)(hitX[middleHit], hitY[middleHit], hitZ[middleHit]);
         const float3 hit2 = (float3)(hitX[outerHit], hitY[outerHit], hitZ[outerHit]);
-        
+
         //calculate Pt
         const float3 pP0 = (float3)(hit0.x, hit0.y, hit0.x * hit0.x + hit0.y * hit0.y);
         const float3 pP1 = (float3)(hit1.x, hit1.y, hit1.x * hit1.x + hit1.y * hit1.y);
@@ -88,8 +86,12 @@ public:
         //const float C = 2.998E8;
         // 1 GeV/c = 5.344286×10^-19 J s/m (joule seconds per meter)
         const float GEV_C = 5.344286E-19;
-        
-        tripletsPt[triplet_index] = Q * BZ * (circle_radius * 1E-2) / GEV_C;
+
+        // as we are comparing p_t difference, we don't care about linear transformations
+        // so we could skip calculating the products and divisions and stick to the bare radius
+        // even since we are just comparing for mininum pt difference we could skip the sqrt
+        // as well since sqrt is a monotonic increasing function.
+        tripletsPt[tripletIndex] = Q * BZ * (circle_radius * 1E-2) / GEV_C;
     },
     cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_mem,
     cl_mem,
