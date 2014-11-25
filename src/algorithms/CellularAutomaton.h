@@ -60,6 +60,7 @@ public:
         const uint followerState = currentStates[tripletFollower];
         const bool sameStateTest = currentStates[tripletsBasis[tripletPair]] == followerState;
         //printf("BEFORE: %u %u", nextStates[tripletFollower],  followerState + sameStateTest);
+        //TODO why I didn't put this inside the if????m
         uint old = atomic_max(&(nextStates[tripletFollower]), followerState + sameStateTest);
         if (sameStateTest) {
             atomic_or(&(livingCells[tripletFollower]), sameStateTest);
@@ -199,7 +200,7 @@ public:
                      const __global uint * const __restrict basisIndexes,
                      //output
                      __global uint * const __restrict followerBestBasis,
-                     __global uint * const __restrict tripletIsBestBasisForFollower,
+                     __global uint * const __restrict tripletIsBestBasis,
                      //workload
                      const uint nTriplets)
     {
@@ -209,9 +210,10 @@ public:
             return;
         }
 
-        // at the begining no triplets are best basis, it is set here
-        // rather than initializing and transfering a buffer.
-        tripletIsBestBasisForFollower[tripletIndex] = 0;
+        // at the beginning no triplets are best basis, it is set here
+        // rather than initializing and transferring a buffer.
+        //TODO ESTO DEBIA ESTAR CAUSANDO PROBLEMAS
+        //tripletIsBestBasis[tripletIndex] = 0;
 
         const uint begin = followerBasisCountPrefixSum[tripletIndex];
         const uint end = followerBasisCountPrefixSum[tripletIndex + 1];
@@ -231,14 +233,14 @@ public:
         }
 
         followerBestBasis[tripletIndex] = minPtIndex;
-        tripletIsBestBasisForFollower[minPtIndex] = 1;
+        tripletIsBestBasis[minPtIndex] = 1;
     },
 
     cl_mem, cl_mem, cl_mem,
     cl_mem, cl_mem,
     cl_uint);
 
-
+    //TODO can this kernel and the previous be merged?
     KERNEL_CLASS(handlersStateStore,
                  __kernel void handlersStateStore(
                      //input
@@ -282,7 +284,7 @@ public:
 
         const uint storageOffset = tripletHandlerStatesPrefixSum[tripletIndex];
         const uint length = tripletHandlerStatesPrefixSum[tripletIndex + 1] - storageOffset;
-
+        //TODO WHY DID I PUT THIS RETURN HERE?
         if (length == 0) {
             return;
         }
