@@ -140,11 +140,6 @@ HitCollection::tTrackList HitCollection::addEvent(const PB_Event::PEvent& event,
         for (auto & hit : layers[i]) {
             uint detId = hit.detectorid();
             int index = geom.resolveDetId(detId);
-            if (index != -1) {
-                detId = index;
-            } else {
-                PLOG << "\tInvalid DetectorId used: << " << detId << std::endl;
-            }
 
             int id = addWithValue(hit.position().x(), hit.position().y(),
                                   hit.position().z(), hit.layer(), detId,
@@ -157,10 +152,17 @@ HitCollection::tTrackList HitCollection::addEvent(const PB_Event::PEvent& event,
                  << hit.position().x() << ", "
                  << hit.position().y() << ", "
                  << hit.position().z() << "]";
+            
+            if (index != -1) {
+                detId = index;
+            } else {
+                PLOG << " Invalid DetectorId used: << " << detId;
+            }
             PLOG << std::endl;
         }
     }
 
+    /*
     uint i = 0;
     for (tTrackListIDs::const_iterator itTrack = trackListNewIDs.begin();
             itTrack != trackListNewIDs.end(); ++itTrack) {
@@ -173,7 +175,7 @@ HitCollection::tTrackList HitCollection::addEvent(const PB_Event::PEvent& event,
         PLOG << std::endl;
         i++;
     }
-
+    */
     return findableTracks;
 }
 
