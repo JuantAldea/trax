@@ -91,7 +91,8 @@ public:
         // so we could skip calculating the products and divisions and stick to the bare radius
         // even since we are just comparing for mininum pt difference we could skip the sqrt
         // as well since sqrt is a monotonic increasing function.
-        tripletsPt[tripletIndex] = Q * BZ * (circle_radius * 1E-2) / GEV_C;
+        //tripletsPt[tripletIndex] = Q * BZ * (circle_radius * 1E-2) / GEV_C;
+        tripletsPt[tripletIndex] = circle_radius;
     },
     cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_mem,
     cl_mem,

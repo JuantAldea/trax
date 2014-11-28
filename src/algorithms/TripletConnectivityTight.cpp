@@ -3,6 +3,7 @@
 
 std::tuple<clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>* >
 TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &trackletsInitial,
+                              const TripletConfigurations & layerTriplets,
                               const float dEtaCut, const uint nThreads, bool printPROLIX) const
 {
     LOG << std::endl << "BEGIN TripletConnectivityTight" << std::endl;
@@ -59,11 +60,19 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
               trackletsInitial.transfer.buffer(TrackletHit3()),
               trackletsInitial.transfer.buffer(TrackletHit1()),
               trackletsInitial.transfer.buffer(TrackletHit2()),
+
+              trackletsInitial.trackletOffsets.get_mem(),
+              hits.transfer.buffer(EventNumber()),
+              hits.transfer.buffer(DetectorLayer()),
+              layerTriplets.size(),
+              trackletsInitial.trackletOffsets.get_count(),
+
               m_tripletEta.get_mem(),
               dEtaCut,
               //output
               m_trackletFollowerPrefixSum.get_mem(),
               m_oracle.get_mem(),
+              //workload
               nTracklets,
               //thread config
               range(nGroups * nThreads),
@@ -132,10 +141,12 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
 
     clever::vector<uint, 1> * m_connectableTripletBasis = new clever::vector<uint, 1>
         (nTrackletConnectablePairs, ctx);
-    
-    clever::vector<uint, 1> * m_connectableTripletFollowers = new clever::vector<uint, 1> 
+
+    clever::vector<uint, 1> * m_connectableTripletFollowers = new clever::vector<uint, 1>
         (nTrackletConnectablePairs, ctx);
 
+    clever::vector<uint, 1> * m_tripletPairEvent = new clever::vector<uint, 1>
+        (nTrackletConnectablePairs, ctx);
 
     evt = tripletConnectivityTightStore.run(
               //input
@@ -143,12 +154,20 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
               trackletsInitial.transfer.buffer(TrackletHit3()),
               trackletsInitial.transfer.buffer(TrackletHit1()),
               trackletsInitial.transfer.buffer(TrackletHit2()),
+
+              trackletsInitial.trackletOffsets.get_mem(),
+              hits.transfer.buffer(EventNumber()),
+              hits.transfer.buffer(DetectorLayer()),
+              layerTriplets.size(),
+              trackletsInitial.trackletOffsets.get_count(),
+
               m_tripletEta.get_mem(),
               dEtaCut,
               m_trackletFollowerPrefixSum.get_mem(),
               //output
               m_connectableTripletBasis->get_mem(),
               m_connectableTripletFollowers->get_mem(),
+              m_tripletPairEvent->get_mem(),
               //workload
               nTracklets,
               //thread config
@@ -184,6 +203,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
         PLOG << std::endl;
     }
 
+    /*
     // Fom here, we already have the triplet pairings that share two hits
     // Some triplets cannot aren't connectable already,
     // those that have the their oracle set to 0.
@@ -213,6 +233,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
     //TODO make a class for stream compaction
 
     // Counting the total amount of connectable triplets
+    */
 
     /*
         LOG << "Initializing oracle prefix sum...";
@@ -428,7 +449,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
               range(nGroups * nThreads),
               range(nThreads));
     TripletConnectivityTight::events.push_back(evt);
-    
+
     LOG << "done. Produced " << m_nonConectableTripletIndexes->get_count()
         << " tracklets..." << std::endl;
     //Now we have indexes of triplets that are connectable and those that are not

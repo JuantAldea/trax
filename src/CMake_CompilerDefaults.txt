@@ -1,5 +1,3 @@
-
-
 ## Compiler flags
 if(CMAKE_COMPILER_IS_GNUCXX)
 

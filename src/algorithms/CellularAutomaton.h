@@ -60,10 +60,12 @@ public:
         const uint followerState = currentStates[tripletFollower];
         const bool sameStateTest = currentStates[tripletsBasis[tripletPair]] == followerState;
         //printf("BEFORE: %u %u", nextStates[tripletFollower],  followerState + sameStateTest);
-        //TODO why I didn't put this inside the if????m
+
         uint old = atomic_max(&(nextStates[tripletFollower]), followerState + sameStateTest);
         if (sameStateTest) {
-            atomic_or(&(livingCells[tripletFollower]), sameStateTest);
+            //atomic_or(&(livingCells[tripletFollower]), sameStateTest);
+            //nextStates[tripletFollower] = followerState + 1;
+            livingCells[tripletFollower] = 1;
         }
         //printf("before: %u %u\n", nextStates[tripletFollower],  followerState + sameStateTest);
 
@@ -209,14 +211,24 @@ public:
         if (tripletIndex >= nTriplets) {
             return;
         }
-
+        //printf("THREAD %d");
         // at the beginning no triplets are best basis, it is set here
         // rather than initializing and transferring a buffer.
         //TODO ESTO DEBIA ESTAR CAUSANDO PROBLEMAS
         //tripletIsBestBasis[tripletIndex] = 0;
 
-        const uint begin = followerBasisCountPrefixSum[tripletIndex];
-        const uint end = followerBasisCountPrefixSum[tripletIndex + 1];
+        //const uint begin = followerBasisCountPrefixSum[tripletIndex];
+        //const uint end = followerBasisCountPrefixSum[tripletIndex + 1];
+        const uint notThread0 = tripletIndex > 0;
+        //index = 0 => to 0 anyway;
+        //index > 0 => shift one to left
+        const uint offsetAsInExclusivePS = (tripletIndex - 1) * notThread0;
+        //index = 0 => reads from 0, valid position, but then multiplies by 0 so it gets 0
+        //index > 0 => read from the shifted position, multiplies by 1 hence no change
+        const uint begin = followerBasisCountPrefixSum[offsetAsInExclusivePS];//* notThread0;
+        //index = 0 => reads from 0 + 0  so its end
+        //index > 0 => reads from the shifted position + 1
+        const uint end = followerBasisCountPrefixSum[offsetAsInExclusivePS +1];// notThread0];
 
         if (begin == end) {
             return;

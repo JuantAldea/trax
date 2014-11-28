@@ -86,7 +86,8 @@ tCircleParams PhysicsRecord::getCircleParams(const Hit & p1, const Hit & p2,
 void PhysicsRecord::fillData(const TrackletCollection& tracklets,
                              const HitCollection::tTrackList& mcTruth, const HitCollection& hits, uint nLayerTriplets, std::map<uint, std::vector<uint>> &tracks)
 {
-    LOG << "Evaluating event " << event << " layer triplet " << layerTriplet  << std::endl;
+    LOG << "Evaluating event " << event << "/" << eventsInGroup
+        << " layer triplet " << layerTriplet << "/" << totalLayers << std::endl;
 
     //std::ofstream histo("ptCalc", std::ios::app);
 
@@ -129,7 +130,7 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
                     swPt++;
                     else
                     rwPt++;*/
-
+/*
                     VLOG << zkr::cc::fore::green;
                     VLOG << "Track " << tracklet.trackId(hits) << " : "
                          << tracklet.hit1() << "-"
@@ -159,6 +160,7 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
                     VLOG << " PT: " << tPt;
 
                     VLOG << zkr::cc::console << std::endl;
+*/
                 } else {
                     //clone
                     ++foundClones;
@@ -176,6 +178,7 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
                     swPt++;
                     else
                     rwPt++;*/
+/*                        
                     VLOG << "\t\t";
                     VLOG << zkr::cc::fore::yellow;
                     VLOG << "Track CLONE:" << tracklet.trackId(hits) << " : "
@@ -190,6 +193,7 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
                                          
                     VLOG << " PT: " << tPt;
                     VLOG << zkr::cc::console << std::endl;
+*/
                 }
             } else {
                 //not in findable tracks definition but still valid
@@ -202,7 +206,7 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
 
             eta[getEtaBin(tEta)].fake++;
             pt[getPtBin(tPt)].fake++;
-
+/*
             VLOG << zkr::cc::fore::red;
             VLOG << "Fake: "
                 << "[" << tracklet.hit1()
@@ -221,6 +225,7 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
             VLOG << " PT: " << tPt;
             
             VLOG << zkr::cc::console << std::endl;
+*/
         }
     }
 
@@ -229,7 +234,7 @@ void PhysicsRecord::fillData(const TrackletCollection& tracklets,
     //output not found tracks
     for (auto vTrack : mcTruth) {
         if (foundTracks.find(vTrack.first) == foundTracks.end()) {
-            VLOG << "Didn't find track " << vTrack.first << std::endl;
+//            VLOG << "Didn't find track " << vTrack.first << std::endl;
 
             PHitWrapper innerHit(vTrack.second[0]);
             PHitWrapper middleHit(vTrack.second[floor(vTrack.second.size() / 2)]);

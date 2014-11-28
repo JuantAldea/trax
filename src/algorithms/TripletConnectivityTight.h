@@ -15,7 +15,7 @@ using namespace std;
 /*
  possible todos:
  - improve performance by using local caching of the connectivity quantity
- - more complex tests ( fitted trajectory, theta / phi values of triptles )
+ - more complex tests ( fitted trajectory, theta / phi values of triplets )
 
  */
 
@@ -29,8 +29,8 @@ public:
         tripletConnectivityTightCount(context),
         tripletConnectivityTightStore(context),
         streamCompactionGetValidIndexesStore(context),
-        streamCompactionFilter3StreamsStore(context),
-        predicateInversionInPlaceStore(context),
+        //streamCompactionFilter3StreamsStore(context),
+        //predicateInversionInPlaceStore(context),
         predicateInversionStore(context)
     {
         PLOG << "tripletConnectivityTightCount WorkGroupSize: "
@@ -40,7 +40,7 @@ public:
     }
 
     std::tuple<clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>*>
-    run(const HitCollection &hits, TrackletCollection &tracklets, const float dEtaCut,
+    run(const HitCollection &hits, TrackletCollection &tracklets, const TripletConfigurations & layerTriplets, const float dEtaCut,
         const uint nThreads, bool printPROLIX = false) const;
 
 
@@ -79,7 +79,7 @@ public:
     cl_uint);
 
 
-    // TODO Incorporate layer information.
+    // TODO evaluate impact of branch divergence from incorporating layer information.
     KERNEL_CLASS(tripletConnectivityTightCount,
                  __kernel void tripletConnectivityTightCount(
                      //input
@@ -87,6 +87,13 @@ public:
                      __global const uint * const __restrict hitsBasisH2,
                      __global const uint * const __restrict hitsFollowersH0,
                      __global const uint * const __restrict hitsFollowersH1,
+
+                     __global const uint * const __restrict tripletOffsets,
+                     __global const uint * const __restrict hitEvent,
+                     __global const uint * const __restrict hitLayer,
+                     const uint nLayers,
+                     const uint nOffsets,
+
                      __global const float * const __restrict tripletsEta,
                      const float dEtaCut,
                      //output
@@ -103,38 +110,59 @@ public:
             return;
         }
 
+        if(tripletIndex >= tripletOffsets[nOffsets - 2]){
+            return;
+        }
+
         const uint hitIndexInner = hitsBasisH1[tripletIndex];
         const uint hitIndexOuter = hitsBasisH2[tripletIndex];
+        const uint hitEventNumber = hitEvent[hitIndexInner];
+        const uint hitLayerNumber = hitLayer[hitIndexInner] - 1;
+
         const float localTripletEta = tripletsEta[tripletIndex];
 
         uint connectivityCountLocal = 0;
-        for (uint i = 0; i < nTracklets; i++) {
+
+        uint begin = tripletOffsets[hitEventNumber * nLayers + hitLayerNumber];
+
+        uint end = tripletOffsets[hitEventNumber * nLayers + hitLayerNumber + 1];
+
+        if (hitEventNumber != hitEvent[hitsFollowersH0[begin]]){
+            return;
+        }
+
+        for (uint i = begin; i < end; i++) {
             const bool test = (hitIndexInner == hitsFollowersH0[i])
                               * (hitIndexOuter == hitsFollowersH1[i])
                               * (fabs(localTripletEta - tripletsEta[i]) < dEtaCut);
 
             connectivityCountLocal += test;
 
-            //protecting this atomic_or with the if reduces the kernel time form 60ms to 16
+            //protecting this atomic_or with the if reduces the kernel time from 60ms to 16
             if (test) {
                 //atomic_or(&connectivityOracle[i / sizeof(uint)], test << (i % sizeof(uint)));
                 //atomic_or(&connectivityOracle[i], test);
                 //given that this will always set to 1, is the atomic really needed?
-                atomic_or(&connectivityOracle[i], 1);
+                connectivityOracle[i] = 1;
+                //atomic_or(&connectivityOracle[i], 1);
                 //connectivityOracle[i] = 1;
             }
         }
-
         connectivityCount[tripletIndex] = connectivityCountLocal;
 
         //atomic_or(&connectivityOracle[tripletIndex / sizeof(uint)], (connectivityCountLocal > 0) << (tripletIndex % sizeof(uint)));
         if (connectivityCountLocal) {
             //atomic_or(&connectivityOracle[tripletIndex], connectivityCountLocal > 0);
-            atomic_or(&connectivityOracle[tripletIndex], 1);
+            connectivityOracle[tripletIndex] = 1;
+            //atomic_or(&connectivityOracle[tripletIndex], 1);
             //connectivityOracle[tripletIndex] = 1;
         }
     },
-    cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_float,
+    cl_mem, cl_mem, cl_mem, cl_mem,
+    cl_mem, cl_mem, cl_mem, cl_uint, cl_uint,
+
+    cl_mem, cl_float,
+
     cl_mem, cl_mem,
     cl_uint);
 
@@ -145,12 +173,22 @@ public:
                      __global const uint * const __restrict hitsBasisH2,
                      __global const uint * const __restrict hitsFollowersH0,
                      __global const uint * const __restrict hitsFollowersH1,
+
+                     __global const uint * const __restrict tripletOffsets,
+                     __global const uint * const __restrict hitEvent,
+                     __global const uint * const __restrict hitLayer,
+                     const uint nLayers,
+                     const uint nOffsets,
+
+
                      __global const float * const __restrict tripletsEta,
                      const float dEtaCut,
-                     __global const uint * const __restrict connectivityPrefixSum,
+                     __global const uint * const __restrict storageOffsets,
+
                      //output
                      __global uint * const __restrict baseTriplet,
                      __global uint * const __restrict followerTriplet,
+                     __global uint * const __restrict tripletPairEvent,
                      //work load
                      const uint nTracklets)
     {
@@ -160,12 +198,29 @@ public:
             return;
         }
 
+        if(tripletIndex >= tripletOffsets[nOffsets - 2]){
+            return;
+        }
+
         const uint hitIndexInner = hitsBasisH1[tripletIndex];
         const uint hitIndexOuter = hitsBasisH2[tripletIndex];
+        const uint hitEventNumber = hitEvent[hitIndexInner];
+        const uint hitLayerNumber = hitLayer[hitIndexInner] - 1;
+
         const float localTripletEta = tripletsEta[tripletIndex];
 
-        uint storeOffset = connectivityPrefixSum[tripletIndex];
-        const uint storeOffsetNextTriplet = connectivityPrefixSum[tripletIndex + 1];
+        uint connectivityCountLocal = 0;
+
+        uint begin = tripletOffsets[hitEventNumber * nLayers + hitLayerNumber];
+
+        uint end = tripletOffsets[hitEventNumber * nLayers + hitLayerNumber + 1];
+
+        if (hitEventNumber != hitEvent[hitsFollowersH0[begin]]){
+            return;
+        }
+
+        uint storeOffset = storageOffsets[tripletIndex];
+        const uint storeOffsetNextTriplet = storageOffsets[tripletIndex + 1];
 
         //connectivityOracle not needed, vality given by storeOffsets difference
         for (uint i = 0; (i < nTracklets) * (storeOffset < storeOffsetNextTriplet); i++) {
@@ -176,11 +231,15 @@ public:
             // meaning no thread divergence here.
             baseTriplet[storeOffset] = tripletIndex;
             followerTriplet[storeOffset] = i;
+            tripletPairEvent[storeOffset] = hitEventNumber;
             storeOffset += test;
         }
     },
-    cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_float, cl_mem,
-    cl_mem, cl_mem,
+    cl_mem, cl_mem, cl_mem, cl_mem,
+    cl_mem, cl_mem, cl_mem, cl_uint, cl_uint,
+
+    cl_mem, cl_float, cl_mem,
+    cl_mem, cl_mem, cl_mem,
     cl_uint);
 
 
@@ -212,7 +271,7 @@ public:
     cl_mem,
     cl_mem,
     cl_uint);
-
+/*
     KERNEL_CLASS(streamCompactionFilter3StreamsStore,
                  __kernel void streamCompactionFilter3StreamsStore(
                      //input
@@ -244,7 +303,8 @@ public:
     cl_mem, cl_mem, cl_mem, cl_mem,
     cl_mem, cl_mem, cl_mem,
     cl_uint);
-
+*/
+/*
     KERNEL_CLASS(predicateInversionInPlaceStore,
                  __kernel void predicateInversionInPlaceStore(
                      //I/O
@@ -262,7 +322,8 @@ public:
     },
     cl_mem,
     cl_uint);
-
+*/
+    //TODO mergue this kernel with another, this is way too simple
     KERNEL_CLASS(predicateInversionStore,
                  __kernel void predicateInversionStore(
                      //input

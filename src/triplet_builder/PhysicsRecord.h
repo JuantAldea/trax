@@ -103,11 +103,19 @@ struct tCircleParams {
 class PhysicsRecord
 {
 public:
-    PhysicsRecord(uint e, uint lt) :
-        event(e), layerTriplet(lt), efficiencyMean(0), efficiencyVar(0), fakeRateMean(0),
+    PhysicsRecord(uint eventNumber, uint totalEvents, uint lt, uint numberOfLayers) :
+        event(eventNumber),
+        eventsInGroup(totalEvents),
+        layerTriplet(lt),
+        totalLayers(numberOfLayers),
+        efficiencyMean(0),
+        efficiencyVar(0),
+        fakeRateMean(0),
         fakeRateVar(0),
-        cloneRateMean(0), cloneRateVar(0), n(1),
-        pt(0.1), eta(0.1) { }
+        cloneRateMean(0),
+        cloneRateVar(0), n(1),
+        pt(0.1),
+        eta(0.1) { }
 
     void fillData(const TrackletCollection & tracklets, const HitCollection::tTrackList & mcTruth,
                   const HitCollection & hits, uint nLayerTriplets, std::map<uint, std::vector<uint>> &tracks);
@@ -123,8 +131,9 @@ public:
 
 public:
     uint event;
-
+    uint eventsInGroup;
     uint layerTriplet;
+    uint totalLayers;
 
     long double efficiencyMean;
     long double efficiencyVar;

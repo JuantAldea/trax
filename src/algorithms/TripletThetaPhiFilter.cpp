@@ -156,7 +156,7 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
               range(nThreads));
     TripletThetaPhiFilter::events.push_back(evt);
     LOG << "done" << std::endl;
-  
+
     if ((PROLIX) && printPROLIX) {
         PLOG << "[TripletThetaPhiFilter] Fetching triplet offets after monotonize...";
         std::vector<uint> tripOffsets = tracklets->getTrackletOffsets();
@@ -168,6 +168,10 @@ TrackletCollection * TripletThetaPhiFilter::run(HitCollection & hits, const Grid
         }
         PLOG << std::endl;
 
+
+
+
+        PLOG << std::endl;
         PLOG << "WHAT ARE THESE Offsets:" << std::endl;
         for (uint i = 0; i < tripOffsets.size(); ++i) {
             Tracklet tracklet(*tracklets, tripOffsets[i]);
