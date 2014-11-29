@@ -218,6 +218,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 
         uint event = loader.skipEvents;
         for (uint eventGroup = 0; eventGroup < evtGroups; ++eventGroup) {
+            LOG << "Processing event group: " << eventGroup << std::endl;
             //if last group is not a full group
             uint evtGroupSize = std::min(exec.eventGrouping, lastEvent - event);
 
@@ -329,22 +330,36 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             /*******************************************/
 #define MIO
 #ifdef MIO
-            std::map<uint, std::vector<uint>> tracks;
+            std::map<uint, std::map<uint, std::vector<uint>>> tracks;
             for (uint i = 0; i < hits.size(); i++){
-                tracks[hits.getValue(HitId(), i)].push_back(i);
-                std::sort(tracks[hits.getValue(HitId(), i)].begin(), tracks[hits.getValue(HitId(), i)].end());
+                tracks[hits.getValue(EventNumber(), i)][hits.getValue(HitId(), i)].push_back(i);
             }
 
-            int trackNumber = 1;
             for (auto it=tracks.begin(); it!=tracks.end(); ++it){
-                PLOG << "#" << trackNumber << " SIMULATED " << it->first << " => ";
-                trackNumber++;
-                auto track = it->second;
-                for(auto it2 = track.begin(); it2 != track.end(); it2++){
-                    PLOG << *it2 << '-';
+                auto eventTracks = it->second;
+                for (auto it2=eventTracks.begin(); it2!=eventTracks.end(); ++it2){
+                    auto track = it2->second;
+                    std::sort(track.begin(), track.end());
                 }
-                PLOG << std::endl;
             }
+
+            /*
+            int trackNumber = 1;
+            for (auto it=tracks.begin(); it!=tracks.end(); ++it) {
+                auto eventTracks = it->second;
+                int trackNumberEvent = 1;
+                for (auto it2=eventTracks.begin(); it2!=eventTracks.end(); ++it2){
+                    std::cout << "Event: " <<  it-> first << " #" << trackNumber << ", " << trackNumberEvent << " SIMULATED " << it->first << " => ";
+                    trackNumberEvent++;
+                    trackNumber++;
+                    auto track = it2->second;
+                    for(auto it3 = track.begin(); it3 != track.end(); it3++){
+                        std::cout << *it3 << '-';
+                    }
+                    std::cout << std::endl;
+                }
+            }
+            */
 
             // On average a dEta = 0.0256 cut reduces the amount of triplets pairs by a 33.7% (stdev 19.6)
             TripletConnectivityTight tripletConnectivityTight(*contx);
@@ -394,7 +409,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
                                   *std::get<1>(connectableTrackletsPairIndices),
                                   *tripletPt,
                                   *std::get<2>(connectableTrackletsPairIndices),
-                                  exec.threads, true);
+                                  exec.threads, false);
             runtime.cellularAutomaton.stopWalltime();
 
 
@@ -512,6 +527,8 @@ int main(int argc, char *argv[])
      "MC data only: load only tracks with hits in each layer")
     ("data.eventLoader", po::value<std::string>(&loader.eventLoader)->default_value("standard"),
      "specify event loader: \"standard\" for PEventContainer (default); \"store\" for EventStore; \"repeated\" for performance measurements")
+    ("data.singleEvent", po::value<uint>(&loader.singleEvent)->default_value(0),
+     "Event to use with the SingleEventLoader")
     ;
 
     po::options_description cExec("Config File: Execution Options");
@@ -678,7 +695,7 @@ int main(int argc, char *argv[])
         LLOG << "Experiment " << e << "/" << executions.size() << ": " << std::endl;
         LLOG << executions[e].first << " " << executions[e].second << std::endl;
         for (uint i = 0; i < exec.iterations; ++i) {
-            LLOG << "Experiment iteration: " << i + 1 << "  " << std::flush;
+            LLOG << "Experiment iteration: " << i + 1 << "  " << std:: endl << std::flush ;
             auto res = buildTriplets(executions[e].first, executions[e].second, grid, contx);
 
             contx->clearAllBuffers();
@@ -756,17 +773,21 @@ void printTracks(const std::vector<uint> &vTrackCollection,
             }
             track->push_back(hit3);
         }
+        PLOG << "RAW TRACK: ";
+        for (auto it : *track){
+            PLOG << it << "-";
+        }
+        PLOG << std::endl;
         trackCollection.push_back(track);
     }
 
     std::set<uint> tracksToRemove;
-
+    PLOG << "NTRACKS = " << trackCollection.size() << std::endl;
     for (uint i = 0; i < trackCollection.size(); i++){
         std::vector<uint> *track = trackCollection[i];
         if(tracksToRemove.find(i) != tracksToRemove.end()){
             continue;
         }
-
 
         for(uint j = i + 1; j < trackCollection.size(); j++){
             std::vector<uint> *track2 = trackCollection[j];
@@ -775,11 +796,12 @@ void printTracks(const std::vector<uint> &vTrackCollection,
             }
 
             if(tracksToRemove.find(i) != tracksToRemove.end()){
-                break;
+                continue;
             }
 
-            if (track2->size() == track->size()){
-                continue;
+            if(hits.getValue(EventNumber(), tracklets->getValue(TrackletHit1(), track->front()))
+                != hits.getValue(EventNumber(), tracklets->getValue(TrackletHit1(), track2->front()))) {
+                break;
             }
             std::vector<uint> *longerTrack;
             std::vector<uint> *shorterTrack;
@@ -854,6 +876,7 @@ void printTracks(const std::vector<uint> &vTrackCollection,
         PLOG << "\tTriplets: ";
 
         std::vector<uint> trackIDs;
+        int eventNumber = 0;
         bool monotonicDecreasingPt = true;
         float previousPt = std::numeric_limits<float>::max();
         float pts[20];
@@ -868,7 +891,7 @@ void printTracks(const std::vector<uint> &vTrackCollection,
             trackIDs.push_back(hits.getValue(HitId(), hit1));
             trackIDs.push_back(hits.getValue(HitId(), hit2));
             trackIDs.push_back(hits.getValue(HitId(), hit3));
-
+            eventNumber = hits.getValue(EventNumber(), hit1);
             PLOG << "[" << hit1 << "-"<< hit2 << "-"<< hit3 << "]";
             // Ideal Magnetic Field [T] (-0,-0, 3.8112)
             const float BZ = 3.8112;
@@ -895,7 +918,7 @@ void printTracks(const std::vector<uint> &vTrackCollection,
         for (uint j = 0; j < trackLength; j++) {
             sum_suared_diffs += std::pow(pts[j] -  avgPt, 2);
         }
-
+        PLOG << std::endl << "\tEvent Number #: " << eventNumber << std::endl;
         PLOG << "\tTrack IDs #: ";
         bool same = true;
         uint trackId;
