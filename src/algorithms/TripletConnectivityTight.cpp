@@ -117,7 +117,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
               m_trackletFollowerPrefixSum.get_count(),
               nThreads,
               TripletConnectivityTight::events);
-    TripletConnectivityTight::events.push_back(evt);
+    //TripletConnectivityTight::events.push_back(evt);
 
     transfer::downloadScalar(m_trackletFollowerPrefixSum, nTrackletConnectablePairs, ctx, true,
                              m_trackletFollowerPrefixSum.get_count() - 1, 1, &evt);
@@ -283,7 +283,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
               m_oracle.get_count(),
               nThreads,
               TripletConnectivityTight::events);
-    TripletConnectivityTight::events.push_back(evt);
+    //TripletConnectivityTight::events.push_back(evt);
 
     uint nConnectableTracklets;
     transfer::downloadScalar(m_oracle, nConnectableTracklets, ctx, true, m_oracle.get_count() - 1,
@@ -297,7 +297,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
               m_invOracle.get_count(),
               nThreads,
               TripletConnectivityTight::events);
-    TripletConnectivityTight::events.push_back(evt);
+    //TripletConnectivityTight::events.push_back(evt);
 
     uint nNonConnectableTracklets;
     transfer::downloadScalar(m_invOracle, nNonConnectableTracklets, ctx, true,

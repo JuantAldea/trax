@@ -73,7 +73,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
                   livingCells->get_count(),
                   nThreads,
                   CellularAutomaton::events);
-        CellularAutomaton::events.push_back(evt);
+        //CellularAutomaton::events.push_back(evt);
 
         transfer::downloadScalar(*livingCells, aliveCells, ctx, true,
                                  livingCells->get_count() - 1, 1, &evt);
@@ -161,7 +161,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
               followerBasisCountPrefixSum->get_count(),
               nThreads,
               CellularAutomaton::events);
-    CellularAutomaton::events.push_back(evt);
+    //CellularAutomaton::events.push_back(evt);
 
     uint followerBasisCountPrefixSumTotal;
     transfer::downloadScalar(*followerBasisCountPrefixSum, followerBasisCountPrefixSumTotal, ctx,
@@ -352,7 +352,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
               tripletHandlersStatePrefixSum->get_count(),
               nThreads,
               CellularAutomaton::events);
-    CellularAutomaton::events.push_back(evt);
+    //CellularAutomaton::events.push_back(evt);
 
     uint trackCollectionLength;
     transfer::downloadScalar(*tripletHandlersStatePrefixSum, trackCollectionLength, ctx, true,
