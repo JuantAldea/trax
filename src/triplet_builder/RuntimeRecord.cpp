@@ -598,8 +598,7 @@ std::string RuntimeRecords::csvDump() const
     std::stringstream s;
 
     //header
-    s << Utils::csv({"events", "layers", "layerTriplets", "threads", "hits", "tracks", "n"}) <<
-      SEP;
+    s << Utils::csv({"events", "layers", "layerTriplets", "threads", "hits", "tracks", "n"}) << SEP;
     //read
     s << Utils::csv({"readTime", "readTimeVar", "readBytes", "readBytesVar"}) << SEP;
     //write
@@ -614,25 +613,26 @@ std::string RuntimeRecords::csvDump() const
       << SEP; //tripletFilter
     /**********/
     //tripletConnectivity
-    s << Utils::csv({"tripletFilterCount", "tripletFilterCountVar",
-                     "tripletFilterScan", "tripletFilterScanVar",
-                     "tripletFilterStore", "tripletFilterStoreVar",
-                     "tripletFilterWalltime", "tripletFilterWalltimeVar",
-                     "tripletFilterKernel", "tripletFilterKernelVar"
+    s << Utils::csv({"tripletConnectivityTightCount", "tripletConnectivityTightCountVar",
+                     "tripletConnectivityTightScan", "tripletConnectivityTightScanVar",
+                     "tripletConnectivityTightStore", "tripletConnectivityTightStoreVar",
+                     "tripletConnectivityTightWalltime", "tripletConnectivityTightWalltimeVar",
+                     "tripletConnectivityTightKernel", "tripletConnectivityTightWalltimeKernelVar"
                     }) << SEP;
     //tracklet circle fitter
-    s << Utils::csv({"tripletFilterCount", "tripletFilterCountVar",
-                     "tripletFilterScan", "tripletFilterScanVar",
-                     "tripletFilterStore", "tripletFilterStoreVar",
-                     "tripletFilterWalltime", "tripletFilterWalltimeVar",
-                     "tripletFilterKernel", "tripletFilterKernelVar"
+
+    s << Utils::csv({"trackletCircleFitterCount", "trackletCircleFitterCountVar",
+                     "trackletCircleFitterScan", "trackletCircleFitterScanVar",
+                     "trackletCircleFitterStore", "trackletCircleFitterStoreVar",
+                     "trackletCircleFitterWalltime", "trackletCircleFitterWalltimeVar",
+                     "trackletCircleFitterKernel", "trackletCircleFitterKernelVar"
                     }) << SEP;
     // cellular automaton
-    s << Utils::csv({"tripletFilterCount", "tripletFilterCountVar",
-                     "tripletFilterScan", "tripletFilterScanVar",
-                     "tripletFilterStore", "tripletFilterStoreVar",
-                     "tripletFilterWalltime", "tripletFilterWalltimeVar",
-                     "tripletFilterKernel", "tripletFilterKernelVar"
+    s << Utils::csv({"cellularAutomatonCount", "cellularAutomatonCountVar",
+                     "cellularAutomatonScan", "cellularAutomatonScanVar",
+                     "cellularAutomatonStore", "cellularAutomatonStoreVar",
+                     "cellularAutomatonWalltime", "cellularAutomatonWalltimeVar",
+                     "cellularAutomatonKernel", "cellularAutomatonKernelVar"
                     }) << SEP;
     /*********/
     s << Utils::csv({"totalCount", "totalCountVar", "totalScan", "totalScanVar", "totalStore", "totalStoreVar", "totalWalltime", "totalWalltimeVar", "totalKernel", "totalKernelVar"}); //totalTiming

@@ -59,9 +59,49 @@ protected:
 
 	EventDataLoadingParameters params;
 
-private:
 	PB_Event::PEventContainer pContainer;
 	mutable uint read;
+};
+
+class CyclicEventLoader : public EventLoader
+{
+public:
+	CyclicEventLoader(EventDataLoadingParameters config):
+		EventLoader(config)
+	{
+		;
+	}
+
+	virtual int nEvents() const {
+		return params.maxEvents;
+	}
+
+	virtual const PB_Event::PEvent & getEvent() const {
+		auto &event = pContainer.events(read);
+		read = (read + 1) % EventLoader::nEvents();
+		return event;
+	}
+};
+
+class SingleEventLoader : public EventLoader
+{
+public:
+	SingleEventLoader(EventDataLoadingParameters config):
+		EventLoader(config),
+		event(0)
+	{
+		event = config.singleEvent;
+	}
+
+	virtual int nEvents() const {
+		return params.maxEvents;
+	}
+
+	virtual const PB_Event::PEvent & getEvent() const {
+		return pContainer.events(event);
+	}
+protected:
+	mutable uint event;
 };
 
 class RepeatedEventLoader : public EventLoader{
@@ -162,8 +202,10 @@ public:
 
 		if(evtLoader == "store")
 			loader =  new EventStoreLoader(config);
-
-
+		if(evtLoader == "cyclic")
+			loader =  new CyclicEventLoader(config);
+		if(evtLoader == "single")
+			loader  = new SingleEventLoader(config);
 		return loader;
 	}
 
