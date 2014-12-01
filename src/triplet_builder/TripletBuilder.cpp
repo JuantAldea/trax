@@ -67,7 +67,7 @@ clever::context * createContext(ExecutionParameters exec)
 #else
 #define DEBUG_OCL 0
 #endif
-
+    opencl::PrintInformation();
     clever::context_settings settings;
     if (!exec.useCPU) {
         try {
@@ -262,8 +262,10 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
                 ++iEvt;
             } while (iEvt < evtGroupSize && event < lastEvent);
 
-            LOG << "Loaded " << hits.size() << " hits in " << evtGroupSize << " events" << std::endl;
-
+            std::cout << "Loaded " << hits.size() << " hits in " << evtGroupSize << " events" << std::endl;
+            if (hits.size() == 0){
+                continue;
+            }
             RuntimeRecord runtime(grid.config.nEvents, grid.config.nLayers, layerConfig.size(),
                                   hits.size(), totalValidTracks, exec.threads);
 
@@ -328,7 +330,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             runtime.tripletFilter.stopWalltime();
 
             /*******************************************/
-#define MIO
+//#define MIO
 #ifdef MIO
             std::map<uint, std::map<uint, std::vector<uint>>> tracks;
             for (uint i = 0; i < hits.size(); i++){
@@ -363,6 +365,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 
             // On average a dEta = 0.0256 cut reduces the amount of triplets pairs by a 33.7% (stdev 19.6)
             TripletConnectivityTight tripletConnectivityTight(*contx);
+
             //float dEtaCut  = 0.0256;
             float dEtaCut  = 0.0256;
             runtime.tripletConnectivity.startWalltime();
@@ -422,7 +425,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             std::vector<float> vPt(tripletPt->get_count());
             transfer::download(*tripletPt, vPt, *contx);
 
-            //printTracks(vTrackCollection, vPSum, tracklets, hits, vPt);
+            printTracks(vTrackCollection, vPSum, tracklets, hits, vPt);
 
 
             delete std::get<0>(connectableTrackletsPairIndices);
@@ -435,6 +438,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             LOG << std::endl;
 #endif
             //evaluate it
+
 
             //runtime
             runtime.fillRuntimes(*contx);
@@ -449,6 +453,8 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
                     physicsRecords.addRecord(physics);
                 }
             }
+
+
 /*
             for (auto it=data.begin(); it!=data.end(); ++it){
                 std::cout << "TRACK " << it->first << " => ";
@@ -460,6 +466,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             }
 */
             //delete variables
+
             delete pairs;
             delete tripletCandidates;
             delete tracklets;
@@ -470,6 +477,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             TripletThetaPhiPredictor::clearEvents();
             TripletThetaPhiFilter::clearEvents();
             PrefixSum::clearEvents();
+
 #ifdef MIO
             TripletConnectivityTight::clearEvents();
             TrackletCircleFitter::clearEvents();
@@ -480,7 +488,6 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 
         delete edLoader;
     } //destruction order block
-
     return std::make_pair(runtimeRecords, physicsRecords);
 }
 
@@ -784,6 +791,7 @@ void printTracks(const std::vector<uint> &vTrackCollection,
     std::set<uint> tracksToRemove;
     PLOG << "NTRACKS = " << trackCollection.size() << std::endl;
     for (uint i = 0; i < trackCollection.size(); i++){
+        break;
         std::vector<uint> *track = trackCollection[i];
         if(tracksToRemove.find(i) != tracksToRemove.end()){
             continue;
