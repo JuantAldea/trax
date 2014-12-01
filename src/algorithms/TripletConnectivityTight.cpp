@@ -125,6 +125,10 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
 
     PLOG << "Counted a total of" << nTrackletConnectablePairs
         << " connectable triplet pairs." << std::endl;
+    if (!nTrackletConnectablePairs){
+        return make_tuple(nullptr, nullptr, nullptr, nullptr);
+    }
+
     /*
         if (((PROLIX) && printPROLIX)){
             PLOG << "Store Offsets:" << std::endl;

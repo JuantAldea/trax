@@ -330,7 +330,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             runtime.tripletFilter.stopWalltime();
 
             /*******************************************/
-//#define MIO
+#define MIO
 #ifdef MIO
             std::map<uint, std::map<uint, std::vector<uint>>> tracks;
             for (uint i = 0; i < hits.size(); i++){
@@ -373,14 +373,20 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
                                                    exec.threads, false);
             runtime.tripletConnectivity.stopWalltime();
 
+            if (std::get<0>(connectableTrackletsPairIndices) == nullptr){
+                LOG << "No connectable tracklets found, skipping event..." << std::endl;
+                continue;
+            }
+
             //tripletConnectivityTight.run(hits, *tracklets, dEtaCut, exec.threads, true);
             //std::cerr << tracklets->size() << std::endl;
 
             // TODO filter the stream here maybe?, we dont want gaps neither for the fitting nor for the CA.
 
             runtime.trackletCircleFitter.startWalltime();
-            //#define USE_FAST_FITTERS
-            #ifdef USE_FAST_FITTERS
+
+//#define USE_FAST_FITTERS
+#ifdef USE_FAST_FITTERS
 
             std::vector<float>vPT(tracklets->size());
             for (uint i=0; i< tracklets->size(); i++){
@@ -394,16 +400,15 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
                 //vPT[i] = length(FastHelix(outer, middle, vertex, 3.8112).getPt());
                 vPT[i] = FastHelix(outer, middle, vertex, 3.8112).getPtMagnitude();
             }
+
             // copy vPT to tripletPT
             clever::vector<float, 1> * const tripletPt  = new clever::vector<float, 1>(vPT.size(), *contx);
             contx->transfer_to_buffer(tripletPt->get_mem(), vPT.data(), sizeof(cl_float) * tripletPt->get_count());
-
-            #else
+#else
             TrackletCircleFitter trackletCircleFitter(*contx);
             auto tripletPt = trackletCircleFitter.run(hits, *tracklets,
                              *std::get<2>(connectableTrackletsPairIndices), exec.threads, false);
-            #endif
-
+#endif
             runtime.trackletCircleFitter.stopWalltime();
 
             runtime.cellularAutomaton.startWalltime();
