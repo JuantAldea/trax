@@ -11,8 +11,9 @@
 #include <datastructures/Logger.h>
 
 #include "Parameters.h"
-#define viejos
-#ifdef viejos
+
+#define old
+#ifdef old
 class EventLoader{
 
 public:
