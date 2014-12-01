@@ -9,7 +9,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
                        const clever::vector<float, 1> &tripletsPt,
                        //only for debugging
                        const clever::vector<uint, 1> &connectableTriplets,
-                       const uint nThreads,
+                       uint nThreads,
                        bool printPROLIX) const
 {
     LOG << std::endl << "BEGIN CellularAutomaton" << std::endl;
@@ -29,6 +29,7 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
     */
     const uint nTripletPairs = tripletsBasis.get_count();
     const uint nTriplets = tripletsPt.get_count();
+    nThreads = std::min(nThreads, iteration.getWorkGroupSize());
     const uint nGroupsForTriplets = uint(std::max(1.0f, ceil(float(nTriplets) / nThreads)));
     const uint nGroupsForPairs = uint(std::max(1.0f, ceil(float(nTripletPairs) / nThreads)));
 
@@ -42,7 +43,12 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
 
     PrefixSum prefixSum(ctx);
     uint iterationCount = 0;
-
+    //clever::vector<uint, 1> * const asd = new clever::vector<uint, 1>(4, ctx);
+    //evt = loop.run(asd->get_mem(), range(nGroupsForPairs * nThreads), range(nThreads));
+    //CellularAutomaton::events.push_back(evt);
+    //uint asdd;
+    //transfer::downloadScalar(*asd, asdd, ctx, true, asd->get_count() - 1, 1, &evt);
+    //std::cout << "COLLATZ " << asdd << std::endl << std::flush;
     do {
         iterationCount++;
         evt = memset.run(livingCells->get_mem(), 0, nTriplets, range(nGroupsForTriplets * nThreads),

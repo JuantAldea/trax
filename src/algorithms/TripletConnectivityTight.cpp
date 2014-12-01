@@ -4,12 +4,13 @@
 std::tuple<clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>* >
 TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &trackletsInitial,
                               const TripletConfigurations & layerTriplets,
-                              const float dEtaCut, const uint nThreads, bool printPROLIX) const
+                              const float dEtaCut, uint nThreads, bool printPROLIX) const
 {
     LOG << std::endl << "BEGIN TripletConnectivityTight" << std::endl;
 
     uint nTracklets = trackletsInitial.size();
     uint nOracleCount = nTracklets;
+    nThreads = std::min(nThreads, tripletEtaCalculatorStore.getWorkGroupSize());
     //uint nOracleCount = std::ceil(nTracklets / (float) sizeof(uint));
     uint nGroups = uint(std::max(1.0f, ceil(float(nTracklets) / nThreads)));
 

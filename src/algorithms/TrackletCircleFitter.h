@@ -18,12 +18,14 @@ public:
         KernelWrapper(context),
         trackletCircleFitterStore(context)
     {
+        PLOG << "trackletCircleFitterStore WorkGroupSize: "
+             << trackletCircleFitterStore.getWorkGroupSize() << std::endl;
     }
 
     clever::vector<float, 1>* run(const HitCollection &hits,
                                   const TrackletCollection &tracklets,
                                   const clever::vector<uint, 1> &validTrackletsIndices,
-                                  const uint nThreads,
+                                  uint nThreads,
                                   bool printPROLIX = false) const;
 
 

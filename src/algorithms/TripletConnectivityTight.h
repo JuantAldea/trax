@@ -41,7 +41,7 @@ public:
 
     std::tuple<clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>*, clever::vector<uint, 1>*>
     run(const HitCollection &hits, TrackletCollection &tracklets, const TripletConfigurations & layerTriplets, const float dEtaCut,
-        const uint nThreads, bool printPROLIX = false) const;
+        uint nThreads, bool printPROLIX = false) const;
 
 
     KERNEL_CLASS(tripletEtaCalculatorStore,

@@ -23,6 +23,20 @@ public:
         handlersStateStore(context),
         trackCollectionStore(context)
     {
+        PLOG << "iteration WorkGroupSize: "
+             << iteration.getWorkGroupSize() << std::endl
+             << "memset WorkGroupSize: "
+             << memset.getWorkGroupSize() << std::endl
+             << "memcpy WorkGroupSize: "
+             << memcpy.getWorkGroupSize() << std::endl
+             << "followerBasisCount WorkGroupSize: "
+             << followerBasisCount.getWorkGroupSize() << std::endl
+             << "followerBestBasisStore WorkGroupSize: "
+             << followerBestBasisStore.getWorkGroupSize() << std::endl
+             << "handlersStateStore WorkGroupSize: "
+             << handlersStateStore.getWorkGroupSize() << std::endl
+             << "trackCollectionStore WorkGroupSize: "
+             << trackCollectionStore.getWorkGroupSize() << std::endl;
     }
 
     //void
@@ -31,7 +45,7 @@ public:
              const clever::vector<uint, 1> &tripletsFollowers,
              const clever::vector<float, 1> &tripletsPt,
              const clever::vector<uint, 1> &connectableTriplets,
-             const uint nThreads,
+             uint nThreads,
              bool printPROLIX) const;
 
     //TODO states could be uchars, nextLiving cells could be bitwise
@@ -269,8 +283,8 @@ public:
             return;
         }
 
-        tripletHandlerStatesCount[tripletIndex] = (tripletIsBestBasis[tripletIndex] == 0) *
-                tripletStates[tripletIndex];
+        tripletHandlerStatesCount[tripletIndex] =
+                (tripletIsBestBasis[tripletIndex] == 0) * tripletStates[tripletIndex];
     },
 
     cl_mem, cl_mem,
