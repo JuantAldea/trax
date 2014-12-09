@@ -223,7 +223,7 @@ public:
         const uint storeOffsetNextTriplet = storageOffsets[tripletIndex + 1];
 
         //connectivityOracle not needed, vality given by storeOffsets difference
-        for (uint i = 0; (i < nTracklets) * (storeOffset < storeOffsetNextTriplet); i++) {
+        for (uint i = begin; (i < end) * (storeOffset < storeOffsetNextTriplet); i++) {
             const bool test = (hitIndexInner == hitsFollowersH0[i])
                               * (hitIndexOuter == hitsFollowersH1[i])
                               * (fabs(localTripletEta - tripletsEta[i]) < dEtaCut);
