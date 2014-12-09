@@ -13,7 +13,6 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
     nThreads = std::min(nThreads, tripletEtaCalculatorStore.getWorkGroupSize());
     //uint nOracleCount = std::ceil(nTracklets / (float) sizeof(uint));
     uint nGroups = uint(std::max(1.0f, ceil(float(nTracklets) / nThreads)));
-
     PLOG << "Initial tracklets: " << nTracklets << std::endl;
     cl_event evt;
 
@@ -180,7 +179,7 @@ TripletConnectivityTight::run(const HitCollection &hits, TrackletCollection &tra
               range(nThreads));
     TripletConnectivityTight::events.push_back(evt);
     LOG << "done." << std::endl;
-
+    delete m_tripletPairEvent;
     if (((PROLIX) && printPROLIX)) {
         PLOG << "Fetching connectable tracklets pairs...";
         std::vector<uint> vConnectableTripletBasis(m_connectableTripletBasis->get_count());
