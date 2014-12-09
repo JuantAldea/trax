@@ -75,7 +75,8 @@ public:
         const bool sameStateTest = currentStates[tripletsBasis[tripletPair]] == followerState;
         //printf("BEFORE: %u %u", nextStates[tripletFollower],  followerState + sameStateTest);
 
-        uint old = atomic_max(&(nextStates[tripletFollower]), followerState + sameStateTest);
+        //uint old = atomic_max(&(nextStates[tripletFollower]), followerState + sameStateTest);
+        atomic_max(&(nextStates[tripletFollower]), followerState + sameStateTest);
         if (sameStateTest) {
             //atomic_or(&(livingCells[tripletFollower]), sameStateTest);
             //nextStates[tripletFollower] = followerState + 1;
@@ -228,8 +229,6 @@ public:
         //printf("THREAD %d");
         // at the beginning no triplets are best basis, it is set here
         // rather than initializing and transferring a buffer.
-        //TODO ESTO DEBIA ESTAR CAUSANDO PROBLEMAS
-        //tripletIsBestBasis[tripletIndex] = 0;
 
         //const uint begin = followerBasisCountPrefixSum[tripletIndex];
         //const uint end = followerBasisCountPrefixSum[tripletIndex + 1];
@@ -239,11 +238,12 @@ public:
         const uint offsetAsInExclusivePS = (tripletIndex - 1) * notThread0;
         //index = 0 => reads from 0, valid position, but then multiplies by 0 so it gets 0
         //index > 0 => read from the shifted position, multiplies by 1 hence no change
-        const uint begin = followerBasisCountPrefixSum[offsetAsInExclusivePS];//* notThread0;
-        //index = 0 => reads from 0 + 0  so its end
+        const uint begin = followerBasisCountPrefixSum[offsetAsInExclusivePS] * notThread0;
+        //index = 0 => reads from 0 + 0, so its end.
         //index > 0 => reads from the shifted position + 1
-        const uint end = followerBasisCountPrefixSum[offsetAsInExclusivePS +1];// notThread0];
+        const uint end = followerBasisCountPrefixSum[offsetAsInExclusivePS + 1 * notThread0];
 
+        // otherwise it will get inside an infinite loop!
         if (begin == end) {
             return;
         }
@@ -308,15 +308,13 @@ public:
             return;
         }
 
+
         const uint storageOffset = tripletHandlerStatesPrefixSum[tripletIndex];
         const uint length = tripletHandlerStatesPrefixSum[tripletIndex + 1] - storageOffset;
-        //TODO WHY DID I PUT THIS RETURN HERE?
+
         if (length == 0) {
             return;
         }
-
-        //const uint nTriplets = tripletStates[tripletIndex];
-
         uint basisIndex = tripletIndex;
         for (uint i = 0; i < length; i++) {
             trackCollection[storageOffset + i] = basisIndex;
