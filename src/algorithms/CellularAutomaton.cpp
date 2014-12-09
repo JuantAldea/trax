@@ -96,6 +96,9 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
                  << aliveCells << " alive cells." << std::endl;
         }
     } while (aliveCells > 0);
+
+
+
     /*
     if (((PROLIX) && printPROLIX)) {
         std::vector<uint> vTBasis(tripletsBasis.get_count());
@@ -127,6 +130,11 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
         }
     }
     */
+
+    delete tripletNextState;
+    delete livingCells;
+
+
     LOG << std::endl << "Runing CA, backward phase." << std::endl;
     LOG << std::endl;
     LOG << "Counting basis for a given follower." << "triplets: "
@@ -442,11 +450,11 @@ CellularAutomaton::run(const clever::vector<uint, 1> &tripletsBasis,
     }
 
     delete tripletsStates;
-    delete tripletNextState;
-    delete livingCells;
     delete followerBasisCountPrefixSum;
     delete followerBasisIndices;
     delete followerBasisPtDiff;
+    delete followerBestBasisIndices;
+    delete tripletIsBestBasisForFollower;
 
     // get the state of every basis triplet -> triplets that aren't best basis are outer beginnings of tracks
     // calculate prefixum of the states of triplets that aren't best basis -> we get th
