@@ -34,6 +34,7 @@
 #include <algorithms/TripletThetaPhiPredictor.h>
 #include <algorithms/TripletThetaPhiFilter.h>
 #include <algorithms/GridBuilder.h>
+ #include <algorithms/MatrixMul.h>
 
 #include <algorithms/TripletConnectivityTight.h>
 #include <algorithms/TrackletCircleFitter.h>
@@ -54,20 +55,29 @@
 #include "fastfitters/FastHelix.h"
 
 std::string g_traxDir;
-void printTracks(const std::vector<uint> &vTrackCollection, const std::vector<uint> &vPSum,
-        const TrackletCollection * const tracklets, const HitCollection &hits, const std::vector<float> &vPt);
+
+void printTracks(const std::vector<uint> &vTrackCollection,
+                              const std::vector<uint> &vPSum,
+                              const TrackletCollection * const tracklets,
+                              const HitCollection &hits,
+                              const std::vector<float> &vPt,
+                              uint totalTrack,
+                              float dEtaCut);
 clever::context * createContext(ExecutionParameters exec)
 {
     LLOG << "Creating context for " << (exec.useCPU ? "CPU" : "GPGPU") << "...";
 
-//#define DEBUG
+#define DEBUG_OCL 0
+/*
+#define DEBUG
+
 #define CL_QUEUE_THREAD_LOCAL_EXEC_ENABLE_INTEL  (1<<31)
 #if defined(DEBUG) && defined(CL_QUEUE_THREAD_LOCAL_EXEC_ENABLE_INTEL)
+#undef DEBUG_OCL
 #define DEBUG_OCL CL_QUEUE_THREAD_LOCAL_EXEC_ENABLE_INTEL
-#else
-#define DEBUG_OCL 0
 #endif
-    opencl::PrintInformation();
+*/
+//    opencl::PrintInformation();
     clever::context_settings settings;
     if (!exec.useCPU) {
         try {
@@ -102,6 +112,8 @@ clever::context * createContext(ExecutionParameters exec)
         if (exec.computingPlatform == "amd"){
             settings = clever::context_settings::amd_cpu();
         }else if (exec.computingPlatform == "intel"){
+            char no_vectorize []= {"CL_CONFIG_USE_VECTORIZER=False"};
+            putenv(no_vectorize);
             settings = clever::context_settings::intel_cpu();
         }else{
             settings = clever::context_settings::default_cpu();
@@ -117,10 +129,14 @@ clever::context * createContext(ExecutionParameters exec)
 }
 
 std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec,
-        EventDataLoadingParameters loader, GridConfig gridConfig, clever::context * contx)
+        EventDataLoadingParameters loader, GridConfig gridConfig, clever::context * contx, float dEtaCut)
 {
+
+    //Multiplication mul(*contx);
+    //mul.run(9999999,  exec.threads);
     RuntimeRecords runtimeRecords;
     PhysicsRecords physicsRecords;
+    std::vector<std::vector<tKernelEvent>> runs;
 
     {
         //block to ensure proper destruction
@@ -178,7 +194,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
         dict.transfer.toDevice(*contx, dict);
 
         //Event Data Loader
-        EventLoader * edLoader = EventLoaderFactory::create(loader.eventLoader, loader);
+        unique_ptr<EventLoader> edLoader(EventLoaderFactory::create(loader.eventLoader, loader));
 
         uint lastEvent;
         if (loader.maxEvents == -1) {
@@ -195,7 +211,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
         layerConfig.transfer.toDevice(*contx, layerConfig);
 
         LOG << "Loaded " << layerConfig.size() << " layer triplet configurations" << std::endl;
-
+        std::cout << "Loaded " << layerConfig.size() << " layer triplet configurations" << std::endl;
         if (VERBOSE) {
             for (uint i = 0; i < layerConfig.size(); ++ i) {
                 TripletConfiguration config(layerConfig, i);
@@ -234,6 +250,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             //first: uint = evt in group second: tracklist
             std::map<uint, HitCollection::tTrackList> validTracks;
             uint totalValidTracks = 0;
+            //delete edLoader;
 
             uint iEvt = 0;
             do {
@@ -249,7 +266,12 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
                     << " tracks with minPt " << loader.minPt
                     << " GeV and " << (*eventSupplement)[iEvt].getNHits()
                     << " hits" << std::endl;
-
+               /*
+                 std::cout << "Loaded " << validTracks[iEvt].size()
+                    << " tracks with minPt " << loader.minPt
+                    << " GeV and " << (*eventSupplement)[iEvt].getNHits()
+                    << " hits" << std::endl;
+                */
                 if (VERBOSE) {
                     for (uint i = 1; i <= loader.maxLayer; ++i) {
                         VLOG << "Layer " << i << ": " << (*layerSupplement)[iEvt * loader.maxLayer + i - 1].getNHits()
@@ -262,8 +284,10 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
                 ++iEvt;
             } while (iEvt < evtGroupSize && event < lastEvent);
 
+
             std::cout << "Loaded " << hits.size() << " hits in " << evtGroupSize << " events" << std::endl;
             if (hits.size() == 0){
+                //delete edLoader;
                 continue;
             }
             RuntimeRecord runtime(grid.config.nEvents, grid.config.nLayers, layerConfig.size(),
@@ -287,11 +311,12 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 
             GridBuilder gridBuilder(*contx);
 
-            runtime.buildGrid.startWalltime();
+            //runtime.buildGrid.startWalltime();
             gridBuilder.run(hits, exec.threads, *eventSupplement, *layerSupplement, grid);
-            runtime.buildGrid.stopWalltime();
+            //runtime.buildGrid.stopWalltime();
 
             /****************************/
+
 /*
             // print updated hit information
             PLOG << "UPDATED HIT IDS" << std::endl;
@@ -311,27 +336,31 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 
             PairGeneratorBeamspot pairGen(*contx);
 
-            runtime.pairGen.startWalltime();
-            Pairing * pairs = pairGen.run(hits, geomSupplement, exec.threads, layerConfig, grid);
-            runtime.pairGen.stopWalltime();
+            //runtime.pairGen.startWalltime();
+            Pairing * pairs = pairGen.run(hits, geomSupplement, exec.threads, layerConfig, grid, false);
+            //runtime.pairGen.stopWalltime();
 
             TripletThetaPhiPredictor predictor(*contx);
 
-            runtime.tripletPredict.startWalltime();
+            //runtime.tripletPredict.startWalltime();
             Pairing * tripletCandidates = predictor.run(hits, geom, geomSupplement, dict, exec.threads,
                                           layerConfig, grid, *pairs, false);
-            runtime.tripletPredict.stopWalltime();
+            //runtime.tripletPredict.stopWalltime();
 
             TripletThetaPhiFilter tripletThetaPhi(*contx);
 
-            runtime.tripletFilter.startWalltime();
+            //runtime.tripletFilter.startWalltime();
             TrackletCollection * tracklets = tripletThetaPhi.run(hits, grid, *pairs, *tripletCandidates,
                                              exec.threads, layerConfig, false);
-            runtime.tripletFilter.stopWalltime();
+            //runtime.tripletFilter.stopWalltime();
 
+            delete pairs;
+            delete tripletCandidates;
+            contx->clearPerfCounters();
             /*******************************************/
 #define MIO
 #ifdef MIO
+            /*
             std::map<uint, std::map<uint, std::vector<uint>>> tracks;
             for (uint i = 0; i < hits.size(); i++){
                 tracks[hits.getValue(EventNumber(), i)][hits.getValue(HitId(), i)].push_back(i);
@@ -344,7 +373,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
                     std::sort(track.begin(), track.end());
                 }
             }
-
+            */
             /*
             int trackNumber = 1;
             for (auto it=tracks.begin(); it!=tracks.end(); ++it) {
@@ -367,14 +396,28 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             TripletConnectivityTight tripletConnectivityTight(*contx);
 
             //float dEtaCut  = 0.0256;
-            float dEtaCut  = 0.0256;
+            std::cout << "dEtaCut " << dEtaCut << std::endl;
             runtime.tripletConnectivity.startWalltime();
-            auto connectableTrackletsPairIndices = tripletConnectivityTight.run(hits, *tracklets, layerConfig, dEtaCut,
+
+            clever::vector<uint, 1> * m_connectableTripletBasis;
+            clever::vector<uint, 1> * m_connectableTripletFollowers;
+            clever::vector<uint, 1> * m_conectableTripletIndexes;
+            clever::vector<uint, 1> * m_nonConectableTripletIndexes;
+
+            std::tie(m_connectableTripletBasis,
+                     m_connectableTripletFollowers,
+                     m_conectableTripletIndexes,
+                     m_nonConectableTripletIndexes) = tripletConnectivityTight.run(hits, *tracklets, layerConfig, dEtaCut,
                                                    exec.threads, false);
             runtime.tripletConnectivity.stopWalltime();
 
-            if (std::get<0>(connectableTrackletsPairIndices) == nullptr){
+            if (m_connectableTripletBasis == nullptr){
+                std::cout << "No connectable tracklets found, skipping event..." << std::endl;
                 LOG << "No connectable tracklets found, skipping event..." << std::endl;
+                delete m_connectableTripletBasis;
+                delete m_connectableTripletFollowers;
+                delete m_conectableTripletIndexes;
+                delete m_nonConectableTripletIndexes;
                 continue;
             }
 
@@ -406,51 +449,71 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             contx->transfer_to_buffer(tripletPt->get_mem(), vPT.data(), sizeof(cl_float) * tripletPt->get_count());
 #else
             TrackletCircleFitter trackletCircleFitter(*contx);
-            auto tripletPt = trackletCircleFitter.run(hits, *tracklets,
-                             *std::get<2>(connectableTrackletsPairIndices), exec.threads, false);
+            auto tripletPt = trackletCircleFitter.run(hits, *tracklets, *m_conectableTripletIndexes, exec.threads, false);
 #endif
             runtime.trackletCircleFitter.stopWalltime();
 
             runtime.cellularAutomaton.startWalltime();
             CellularAutomaton cellularAutomaton(*contx);
-            auto caOutput = cellularAutomaton.run(*std::get<0>(connectableTrackletsPairIndices),
-                                  *std::get<1>(connectableTrackletsPairIndices),
+
+            const clever::vector<uint, 1> *reconstructedTracks;
+            const clever::vector<uint, 1> *reconstructedTracksOffsets;
+
+            std::tie(reconstructedTracks, reconstructedTracksOffsets) = cellularAutomaton.run(*m_connectableTripletBasis,
+                                  *m_connectableTripletFollowers,
                                   *tripletPt,
-                                  *std::get<2>(connectableTrackletsPairIndices),
+                                  *m_conectableTripletIndexes,
                                   exec.threads, false);
             runtime.cellularAutomaton.stopWalltime();
 
+            delete m_connectableTripletBasis;
+            delete m_connectableTripletFollowers;
+            delete m_conectableTripletIndexes;
+            delete m_nonConectableTripletIndexes;
 
-            std::vector<uint> vTrackCollection(std::get<0>(caOutput)->get_count());
-            transfer::download(*std::get<0>(caOutput), vTrackCollection, *contx);
+            std::vector<uint> vTrackCollection(reconstructedTracks->get_count());
+            transfer::download(*reconstructedTracks, vTrackCollection, *contx);
 
-            std::vector<uint> vPSum(std::get<1>(caOutput)->get_count());
-            transfer::download(*std::get<1>(caOutput), vPSum, *contx);
+            std::vector<uint> vPSum(reconstructedTracksOffsets->get_count());
+            transfer::download(*reconstructedTracksOffsets, vPSum, *contx);
 
             std::vector<float> vPt(tripletPt->get_count());
             transfer::download(*tripletPt, vPt, *contx);
 
-            printTracks(vTrackCollection, vPSum, tracklets, hits, vPt);
-
-
-            delete std::get<0>(connectableTrackletsPairIndices);
-            delete std::get<1>(connectableTrackletsPairIndices);
-            delete std::get<2>(connectableTrackletsPairIndices);
-            delete std::get<3>(connectableTrackletsPairIndices);
-            delete std::get<0>(caOutput);
-            delete std::get<1>(caOutput);
-
-            LOG << std::endl;
+            delete reconstructedTracks;
+            delete reconstructedTracksOffsets;
+            delete tripletPt;
 #endif
             //evaluate it
-
+            //printTracks(vTrackCollection, vPSum, tracklets, hits, vPt, runtime.tracks, dEtaCut);
 
             //runtime
+            std::vector<tKernelEvent> runEvents;
+            for (cl_event e : TripletConnectivityTight::events) {
+                tKernelEvent t = (*contx).getKernelPerf(e);
+                runEvents.push_back(t);
+            }
+
+            //Circle fitter
+            for (cl_event e : TrackletCircleFitter::events) {
+                tKernelEvent t = (*contx).getKernelPerf(e);
+                runEvents.push_back(t);
+            }
+
+            //Cellular automaton
+            for (cl_event e : CellularAutomaton::events) {
+                tKernelEvent t = (*contx).getKernelPerf(e);
+                runEvents.push_back(t);
+            }
+            runs.push_back(runEvents);
+
             runtime.fillRuntimes(*contx);
+
             runtime.logPrint();
             runtimeRecords.addRecord(runtime);
-            std::map<uint, std::vector<uint>> data;
+            //std::map<uint, std::vector<uint>> data;
             //physics
+            /*
             for (uint e = 0; e < grid.config.nEvents; ++e) {
                 for (uint p = 0; p < layerConfig.size(); ++p) {
                     PhysicsRecord physics(e, grid.config.nEvents, p, layerConfig.size());
@@ -458,6 +521,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
                     physicsRecords.addRecord(physics);
                 }
             }
+            */
 
 
 /*
@@ -472,9 +536,8 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
 */
             //delete variables
 
-            delete pairs;
-            delete tripletCandidates;
             delete tracklets;
+
 
             //reset kernels event counts
             GridBuilder::clearEvents();
@@ -491,7 +554,7 @@ std::pair<RuntimeRecords, PhysicsRecords> buildTriplets(ExecutionParameters exec
             //break;
         }
 
-        delete edLoader;
+        //delete edLoader;
     } //destruction order block
     return std::make_pair(runtimeRecords, physicsRecords);
 }
@@ -703,18 +766,38 @@ int main(int argc, char *argv[])
     RuntimeRecords runtimeRecords;
     PhysicsRecords physicsRecords;
 
+    std::vector<float> dEtaCuts2;
+    float begin = 0.0240;
+    float end = 0.0270;
+    int steps = 30;
+    float step_size = (end - begin) / steps;
+    for (int i = 0; i < steps; i++){
+        dEtaCuts2.push_back(begin + i * step_size);
+        std::cout << dEtaCuts2.back() << ' ';
+    }
+
+    for (int i = 0; i < steps; i++){
+        std::cout << dEtaCuts2[i] << ' ';
+    }
+    //dEtaCuts2.clear();
+    std::cout << std::endl;
+    std::cerr << "ETACUT" << SEP << "TOTAL" << SEP << "FILTERED" << SEP << "VALIDS"  << SEP << "VALIDUNIQUE" << SEP << "FAKES"  << SEP <<  "FAKERATE"  << SEP << "CLONERATE"  << SEP <<  "EFFICIENCE"  << SEP <<  "SIMULATED" << std::endl;
     for (uint e = 0; e < executions.size(); ++e) { //standard case: only 1
         LLOG << "Experiment " << e << "/" << executions.size() << ": " << std::endl;
         LLOG << executions[e].first << " " << executions[e].second << std::endl;
         for (uint i = 0; i < exec.iterations; ++i) {
             LLOG << "Experiment iteration: " << i + 1 << "  " << std:: endl << std::flush ;
-            auto res = buildTriplets(executions[e].first, executions[e].second, grid, contx);
 
-            contx->clearAllBuffers();
-            contx->clearPerfCounters();
+            for (float eta : dEtaCuts2){
+                //cout << "dETA:" << eta << std::endl;
+                auto res = buildTriplets(executions[e].first, executions[e].second, grid, contx, 0.0256);
 
-            runtimeRecords.merge(res.first);
-            physicsRecords.merge(res.second);
+                contx->clearAllBuffers();
+                contx->clearPerfCounters();
+
+                //runtimeRecords.merge(res.first);
+                //physicsRecords.merge(res.second);
+            }
         }
         LLOG << std::endl;
     }
@@ -737,7 +820,7 @@ int main(int argc, char *argv[])
     std::ofstream runtimeRecordsFile(outputFileRuntime.str(), std::ios::trunc);
     runtimeRecordsFile << runtimeRecords.csvDump();
     runtimeRecordsFile.close();
-
+    /*
     std::stringstream outputFilePhysics;
     outputFilePhysics << g_traxDir << "/physics/" << "physics." << getFilename(
                           exec.configFile) << ".csv";
@@ -749,21 +832,134 @@ int main(int argc, char *argv[])
     std::ofstream physicsRecordsFile(outputFilePhysics.str(), std::ios::trunc);
     physicsRecordsFile << physicsRecords.csvDump(outputDirPhysics.str());
     physicsRecordsFile.close();
-
+    */
     std::cout << Logger::getInstance();
 }
 
-void printTracks(const std::vector<uint> &vTrackCollection,
-    const std::vector<uint> &vPSum,
-    const TrackletCollection * const tracklets,
-    const HitCollection &hits,
-    const std::vector<float> &vPt)
+
+typedef typename std::pair<uint, std::shared_ptr<std::vector<uint>>> Track;
+typedef typename std::list<Track> TrackCollection;
+
+typedef typename std::pair<uint, std::shared_ptr<std::vector<uint>>> TripletTrack;
+typedef typename std::list<TripletTrack> TripletTrackCollection;
+struct TripletTrackComparator
 {
-    int iTrack = 0;
 
-    std::map<uint, bool> foundTracks;
+    const TripletTrack &baseTrack;
 
-    std::deque<std::vector<uint>*> trackCollection;
+    TripletTrackComparator() = delete;
+    TripletTrackComparator(const TripletTrack &track) : baseTrack(track) {}
+
+    bool operator()(const TripletTrack &other) const {
+        const TripletTrack &longer = baseTrack.second->size() < other.second->size() ? other : baseTrack;
+        const TripletTrack &shorter = baseTrack.second->size() >= other.second->size() ? other : baseTrack;
+        uint sharedHits = 0;
+        for (auto hit : *(longer.second)){
+            auto found = std::find(shorter.second->begin(), shorter.second->end(), hit);
+            if (found != shorter.second->end()){
+                sharedHits++;
+            }
+        }
+
+        const float fshared = sharedHits/float(shorter.second->size());
+        return fshared >= 0.19 ? true : false;
+    }
+};
+
+bool trackIsValid(const Track &track, const HitCollection &hits)
+{
+    const uint  hitId = hits.getValue(HitId(), track.second->front());
+    for (auto hit : *(track.second)){
+        if (hitId != hits.getValue(HitId(), hit)){
+            return false;
+        }
+    }
+    return true;
+}
+
+TrackCollection cloneRemoval(const TrackCollection &trackCollection)
+{
+    TrackCollection trackCollectionFiltered;
+    for(auto &track : trackCollection){
+
+        auto found = find_if(trackCollectionFiltered.begin(), trackCollectionFiltered.end(), TripletTrackComparator(track));
+
+        if (found == trackCollectionFiltered.end()){
+            trackCollectionFiltered.push_back(track);
+        }else if (found->second->size() == track.second->size()){
+            trackCollectionFiltered.push_back(track);
+        }else if (found->second->size() < track.second->size()){
+            /*
+                std::cout << "REMOVING: ";
+                for(auto hit : *found->second){
+                    std::cout << hit << "-";
+                }
+
+                std::cout << std::endl;
+                std::cout << "ADDING:   ";
+
+                for(auto hit : *(i.second)){
+                    std::cout << hit << "-";
+                }
+
+                std::cout << std::endl;
+            */
+            trackCollectionFiltered.erase(found);
+            trackCollectionFiltered.push_back(track);
+        }
+    }
+    return trackCollectionFiltered;
+}
+
+std::pair<TrackCollection, TrackCollection> splitRealFakeTracks(const TrackCollection &trackCollection, const HitCollection &hits)
+{
+    TrackCollection realTracks;
+    TrackCollection fakeTracks;
+
+    for(auto &track : trackCollection){
+        if (trackIsValid(track, hits)){
+            realTracks.push_back(track);
+        }else{
+            fakeTracks.push_back(track);
+        }
+    }
+    return std::make_pair(realTracks, fakeTracks);
+}
+
+void printTrack(const Track &track, const HitCollection &hits)
+{
+    std::cout << "TRACK #" << track.first << " " << (trackIsValid(track, hits) ? "REAL TRACK" : "FAKE TRACK") << std::endl;
+    std::cout << "    LENGTH: " << track.second->size() << std::endl;
+    std::cout << "    SIM TRACK IDs: ";
+    for (auto hitId : *(track.second)){
+        std::cout << hits.getValue(HitId(), hitId) << " ";
+    }
+    std::cout << std::endl;
+
+    std::cout << "    HIT IDS: ";
+    for (auto hitId : *(track.second)){
+        std::cout << hitId  << "-";
+    }
+    std::cout << std::endl;
+
+    std::cout << "    HIT COORDS: " << std::endl;
+    for (auto &hitId : *(track.second)){
+        const auto hitX = hits.getValue(GlobalX(), hitId);
+        const auto hitY = hits.getValue(GlobalY(), hitId);
+        const auto hitZ = hits.getValue(GlobalZ(), hitId);
+        std::cout << "        " << "[" << hitX << ", " << hitY << ", " << hitZ << "]" << std::endl;
+    }
+    std::cout << std::endl;
+}
+
+TrackCollection extractTracks(const std::vector<uint> &vTrackCollection,
+                              const std::vector<uint> &vPSum,
+                              const TrackletCollection * const tracklets,
+                              const HitCollection &hits,
+                              const std::vector<float> &vPt)
+{
+    TrackCollection trackCollectionList;
+    uint trackID = 0;
     for (uint i = 0; i < vPSum.size() - 1; i++) {
 
         uint trackOffset = vPSum[i];
@@ -773,7 +969,7 @@ void printTracks(const std::vector<uint> &vTrackCollection,
             continue;
         }
 
-        std::vector<uint>* track = new std::vector<uint>();
+        shared_ptr<std::vector<uint>> track(new std::vector<uint>());
         for (uint j = 0; j < trackLength; j++) {
             uint triplet = vTrackCollection[trackOffset + (trackLength - 1 - j)];
             uint hit1 = tracklets->getValue(TrackletHit1(), triplet);
@@ -785,156 +981,145 @@ void printTracks(const std::vector<uint> &vTrackCollection,
             }
             track->push_back(hit3);
         }
-        PLOG << "RAW TRACK: ";
+
+        trackCollectionList.push_back(std::make_pair(trackID++, track));
+        /*
+        std::cout << "RAW TRACK: ";
         for (auto it : *track){
             PLOG << it << "-";
         }
-        PLOG << std::endl;
-        trackCollection.push_back(track);
+        std::cout << std::endl;
+        */
     }
+    return trackCollectionList;
+}
 
-    std::set<uint> tracksToRemove;
-    PLOG << "NTRACKS = " << trackCollection.size() << std::endl;
-    for (uint i = 0; i < trackCollection.size(); i++){
-        break;
-        std::vector<uint> *track = trackCollection[i];
-        if(tracksToRemove.find(i) != tracksToRemove.end()){
-            continue;
-        }
-
-        for(uint j = i + 1; j < trackCollection.size(); j++){
-            std::vector<uint> *track2 = trackCollection[j];
-            if(tracksToRemove.find(j) != tracksToRemove.end()){
-                continue;
-            }
-
-            if(tracksToRemove.find(i) != tracksToRemove.end()){
-                continue;
-            }
-
-            if(hits.getValue(EventNumber(), tracklets->getValue(TrackletHit1(), track->front()))
-                != hits.getValue(EventNumber(), tracklets->getValue(TrackletHit1(), track2->front()))) {
-                break;
-            }
-            std::vector<uint> *longerTrack;
-            std::vector<uint> *shorterTrack;
-            uint removed;
-            uint remover;
-            if(track2->size() > track->size()){
-                longerTrack = track2;
-                shorterTrack = track;
-                removed = i;
-                remover = j;
-            }else {
-                longerTrack = track;
-                shorterTrack = track2;
-                removed = j;
-                remover = i;
-            }
-            uint sharedHits = 0;
-            for (auto hit : *shorterTrack){
-                if (std::find(longerTrack->begin(), longerTrack->end(), hit) != longerTrack->end()){
-                    sharedHits++;
-                }
-            }
-            float fshared = sharedHits/float(shorterTrack->size());
-            if (fshared >= 0.19){
-                PLOG << "FSHARED " << fshared << std::endl;;
-                tracksToRemove.insert(removed);
-                PLOG << "REMOVED-SHARED " <<  remover << " removes " << removed << std::endl;
-                for (auto hit : *track){
-                    PLOG << hit << '-';
-                }
-                PLOG << std::endl;
-                for (auto hit : *track2){
-                    PLOG << hit << '-';
-                }
-                PLOG << std::endl;
-            }
-
+std::map<uint, Track> findUniqueRealTracks(const TrackCollection &reconstructedTracks, const HitCollection &hits)
+{
+    std::map<uint, Track> foundTracks;
+    for (auto &track : reconstructedTracks){
+        if (trackIsValid(track, hits)){
+            foundTracks[hits.getValue(HitId(), track.second->front())] = track;
         }
     }
+    return foundTracks;
+}
 
+void printTracks(const std::vector<uint> &vTrackCollection,
+                              const std::vector<uint> &vPSum,
+                              const TrackletCollection * const tracklets,
+                              const HitCollection &hits,
+                              const std::vector<float> &vPt,
+                              uint totalTracks,
+                              float dEtaCut)
+{
+    TrackCollection reconstructedTracks = extractTracks(vTrackCollection, vPSum, tracklets, hits, vPt);
+    TrackCollection filteredTracks = cloneRemoval(reconstructedTracks);
+    TrackCollection realTracks;
+    TrackCollection fakeTracks;
+    std::tie(realTracks, fakeTracks) = splitRealFakeTracks(filteredTracks, hits);
+    std::map<uint, Track> foundUniqueRealTracks = findUniqueRealTracks(realTracks, hits);
 
-    for(auto it = tracksToRemove.begin(); it != tracksToRemove.end(); it++){
-        //trackCollection.erase(std::find(trackCollection.begin(), trackCollection.end(), *it));
-        PLOG << "REMOVED" << *it << std::endl;
+    uint nTracks = 1;
+/*
+    std::cout << "RECONSTRUCTED TRACKS: " << std::endl;
+    nTracks = 1;
+    for(auto track : reconstructedTracks){
+        std::cout <<  "    #" << nTracks++ << ": ";
+        printTrack(track, hits);
     }
 
+    std::cout << "FILTERED TRACKS: " << std::endl;
+    nTracks = 1;
+    for(auto &track : filteredTracks){
+        std::cout <<  "    #" << nTracks++ << ": ";
+        printTrack(track, hits);
+    }
+
+
+    std::cout << "UNIQUE TRACKS: " << std::endl;
+    nTracks = 1;
+    for(auto &track : filteredTracks){
+        std::cout <<  "    #" << nTracks++ << ": ";
+        printTrack(track, hits);
+    }
+*/
+    std::cout << "       TOTAL: " << reconstructedTracks.size() << std::endl;
+    std::cout << "    FILTERED: " << filteredTracks.size() << std::endl;
+    std::cout << "      VALIDS: " << realTracks.size() << std::endl;
+    std::cout << "VALID UNIQUE: " << foundUniqueRealTracks.size() << std::endl;
+    std::cout << "       FAKES: " << fakeTracks.size() << std::endl;
+    std::cout << "   FAKE RATE: " << fakeTracks.size() / float(filteredTracks.size()) << std::endl;
+    std::cout << "  CLONE RATE: " << (realTracks.size() - foundUniqueRealTracks.size())/ float(filteredTracks.size()) << std::endl;
+    std::cout << "  EFFICIENCE: " << foundUniqueRealTracks.size() / float(totalTracks) << std::endl;
+    std::cout << "   SIMULATED: " << totalTracks << std::endl;
+
+    std::cerr << dEtaCut << SEP
+              << reconstructedTracks.size() << SEP
+              << filteredTracks.size() << SEP
+              << realTracks.size() << SEP
+              << foundUniqueRealTracks.size() << SEP
+              << fakeTracks.size() << SEP
+              << fakeTracks.size() / float(filteredTracks.size()) << SEP
+              << (realTracks.size() - foundUniqueRealTracks.size())/ float(filteredTracks.size()) << SEP
+              << foundUniqueRealTracks.size() / float(totalTracks) << SEP
+              <<  totalTracks << std::endl;
+/*
+    for(auto tripletTrack : trackCollectionListFiltered){
+        if (trackIsFake(track))
+    }
+*/
+    /*
     uint monotonicSuccess = 0;
     uint nonMonotonicSuccess = 0;
     uint monotonicFakes = 0;
     uint nonMonotonicFakes = 0;
 
-    for (uint i = 0; i < vPSum.size() - 1; i++) {
-
-        uint trackOffset = vPSum[i];
-        uint trackLength = vPSum[i + 1] - trackOffset;
-
-        if (trackLength < 3) {
-            continue;
-        }
-        PLOG << "buscando " << i << std::endl;
-        if (std::find(tracksToRemove.begin(), tracksToRemove.end(), uint(i)) != tracksToRemove.end()){
-            PLOG << "Track #" << iTrack << " was deleted" << std::endl;
-            continue;
-        }
-
+    for (auto track : trackCollectionListFiltered) {
         iTrack++;
         //the triplet is a handler.
-        PLOG << "Track #" << iTrack
-             << " with triplet length " << trackLength
-             << " begins at " << trackOffset
+        PLOG << "Track #" << track.first
+             << " with triplet length " << track.second->size()
              << std::endl;
         PLOG << "\tTriplets: ";
 
-        std::vector<uint> trackIDs;
+
         int eventNumber = 0;
         bool monotonicDecreasingPt = true;
-        float previousPt = std::numeric_limits<float>::max();
         float pts[20];
         float avgPt;
 
-        for (uint j = 0; j < trackLength; j++) {
-            uint triplet = vTrackCollection[trackOffset + (trackLength - 1 - j)];
-            uint hit1 = tracklets->getValue(TrackletHit1(), triplet);
-            uint hit2 = tracklets->getValue(TrackletHit2(), triplet);
-            uint hit3 = tracklets->getValue(TrackletHit3(), triplet);
+        for (auto hit : *(track.second)) {
+            uint hit1 = tracklets->getValue(TrackletHit1(), hit);
+            uint hit2 = tracklets->getValue(TrackletHit2(), hit);
+            uint hit3 = tracklets->getValue(TrackletHit3(), hit);
 
-            trackIDs.push_back(hits.getValue(HitId(), hit1));
-            trackIDs.push_back(hits.getValue(HitId(), hit2));
-            trackIDs.push_back(hits.getValue(HitId(), hit3));
             eventNumber = hits.getValue(EventNumber(), hit1);
+
             PLOG << "[" << hit1 << "-"<< hit2 << "-"<< hit3 << "]";
-            // Ideal Magnetic Field [T] (-0,-0, 3.8112)
-            const float BZ = 3.8112;
-            // e = 1.602177×10^-19 C (coulombs)
-            const float Q = 1.602177E-19;
-            // c = 2.998×10^8 m/s (meters per second)
-            //const float C = 2.998E8;
-            // 1 GeV/c = 5.344286×10^-19 J s/m (joule seconds per meter)
-            const float GEV_C = 5.344286E-19;
-            //PLOG << " Pt = " << Q * BZ * (vPt[triplet] * 1E-2) / GEV_C << " ";
             PLOG << " Pt = " << vPt[triplet] << " ";
             //monotonicDecreasingPt &= vPt[triplet] <=  previousPt ||
             //    (std::abs(vPt[triplet] - previousPt)/(std::max(std::abs(vPt[triplet]), std::abs(previousPt)))) < 0.1;
             pts[j] = vPt[triplet];
-            previousPt = vPt[triplet];
         }
+
         avgPt = 0;
         for (uint j = 0; j < trackLength; j++) {
             PLOG << pts[j] << " ";
             avgPt += pts[j];
         }
         avgPt /= trackLength;
+
         float sum_suared_diffs = 0;
         for (uint j = 0; j < trackLength; j++) {
             sum_suared_diffs += std::pow(pts[j] -  avgPt, 2);
         }
+
         PLOG << std::endl << "\tEvent Number #: " << eventNumber << std::endl;
         PLOG << "\tTrack IDs #: ";
         bool same = true;
         uint trackId;
+
         for (auto it = trackIDs.begin(); it != trackIDs.end(); it++){
             if (*it != *trackIDs.begin()){
                 same = false;
@@ -980,7 +1165,7 @@ void printTracks(const std::vector<uint> &vTrackCollection,
             uint hit2 = tracklets->getValue(TrackletHit2(), vTrackCollection[trackOffset + (trackLength - 1 - j)]);
             uint hit3 = tracklets->getValue(TrackletHit3(), vTrackCollection[trackOffset + (trackLength - 1 - j)]);
 
-            PLOG << "[" << hits.getValue(GlobalX(), hit1)
+            PLOG << "["  << hits.getValue(GlobalX(), hit1)
                  << ", " << hits.getValue(GlobalX(), hit2)
                  << ", " << hits.getValue(GlobalX(), hit3)
                  << "]";
@@ -998,4 +1183,5 @@ void printTracks(const std::vector<uint> &vTrackCollection,
         << "(" << monotonicSuccess << ", " << nonMonotonicSuccess <<")" << std::endl;
     PLOG << "Fake reconstructions: " << monotonicFakes + nonMonotonicFakes
         << "(" << monotonicFakes << ", " << nonMonotonicFakes <<")" << std::endl;
+    */
 }
